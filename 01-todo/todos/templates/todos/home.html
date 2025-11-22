@@ -1,0 +1,39 @@
+{% extends 'todos/base.html' %}
+
+{% block title %}Home - Todo App{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Todos</h1>
+    <a class="btn btn-primary" href="{% url 'todo_create' %}">Create Todo</a>
+  </div>
+
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Due</th>
+        <th>Resolved</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for todo in todos %}
+        <tr>
+          <td>{{ todo.title }}</td>
+          <td>{% if todo.due_date %}{{ todo.due_date }}{% endif %}</td>
+          <td>{% if todo.resolved %}Yes{% else %}No{% endif %}</td>
+          <td>
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'todo_edit' todo.pk %}">Edit</a>
+            <a class="btn btn-sm btn-outline-danger" href="{% url 'todo_delete' todo.pk %}">Delete</a>
+            {% if not todo.resolved %}
+              <a class="btn btn-sm btn-success" href="{% url 'todo_resolve' todo.pk %}">Resolve</a>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">No todos yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
