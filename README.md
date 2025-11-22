@@ -1,4 +1,4 @@
 # ai-dev-tools
 https://github.com/DataTalksClub/ai-dev-tools-zoomcamp
 
-Hello World!
+My adventures with AI assited coding.
