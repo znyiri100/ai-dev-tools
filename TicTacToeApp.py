@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox
 import random
+import os
+import sys
 
 #!/usr/bin/env python3
 
@@ -166,5 +168,10 @@ class TicTacToeApp(tk.Tk):
         self.reset_board()
 
 if __name__ == "__main__":
+    # Detect headless environment (no X11/Wayland display) and give instructions.
+    if sys.platform.startswith("linux") and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        print("No display detected. To run the GUI in a headless environment, install Xvfb and run:")
+        print("  xvfb-run -s '-screen 0 1024x768x24' python TicTacToeApp.py")
+        sys.exit(1)
     app = TicTacToeApp()
     app.mainloop()
