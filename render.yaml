@@ -2,6 +2,6 @@ services:
   - type: web
     name: coding-interview-platform
     env: docker
-    root: 02-coding-interview
+    rootDir: 02-coding-interview
     plan: free
     autoDeploy: true
