@@ -222,13 +222,19 @@ def main():
         # Optional Database Upload
         if args.upload:
             try:
-                import load_to_duckdb
-                con = load_to_duckdb.get_db_connection()
-                load_to_duckdb.init_db(con)
-                load_to_duckdb.load_video_metadata(con, output_data)
-                load_to_duckdb.load_transcripts_metadata(con, video_id, output_data.get("transcripts", []))
-                con.close()
-                print(f"✓ Data for {video_id} uploaded to DuckDB", file=sys.stderr)
+                import load_data
+                from database import get_session, init_db
+                
+                # Ensure DB tables exist
+                init_db()
+                
+                session = get_session()
+                try:
+                    load_data.load_video_metadata(session, output_data)
+                    load_data.load_transcripts_metadata(session, video_id, output_data.get("transcripts", []))
+                    print(f"✓ Data for {video_id} uploaded to Database", file=sys.stderr)
+                finally:
+                    session.close()
             except Exception as e:
                 print(f"Error during DB upload for {video_id}: {e}", file=sys.stderr)
 
