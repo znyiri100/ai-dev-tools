@@ -1,12 +1,20 @@
 # YouTube Transcript Data Pipeline
 
-This project provides tools to discover, fetch, and store YouTube video transcripts and metadata using DuckDB. It leverages the `youtube-transcript` MCP server for fetching full text and Python scripts for data management.
+This project provides tools to discover, fetch, and store YouTube video transcripts and metadata. It supports both local storage via **DuckDB** and remote storage via **PostgreSQL** (e.g., Supabase) using **SQLAlchemy** for database abstraction.
+
+## Features
+
+- **Database Agnostic:** Seamlessly switch between local DuckDB and remote Postgres.
+- **MCP Integration:** Uses the `youtube-transcript` MCP server for robust transcript fetching.
+- **SQLAlchemy ORM:** Clean data models and easy migrations.
+- **Topic Search:** Find videos by topic and automatically store their metadata.
 
 ## Prerequisites
 
 - [Docker](https://www.docker.com/) installed and running.
 - [uv](https://github.com/astral-sh/uv) installed for Python dependency management.
-- **YouTube Data API Key** (Required for topic search): Set the environment variable `YOUTUBE_API_KEY`.
+- **YouTube Data API Key**: Required for topic search. Set the environment variable `YOUTUBE_API_KEY`.
+- **(Optional) Postgres Credentials**: Required for remote storage.
 
 ## Setup
 
@@ -20,91 +28,86 @@ This project provides tools to discover, fetch, and store YouTube video transcri
     uv sync
     ```
 
-3.  **Initialize Database (Optional):**
-    The database `youtube_data.duckdb` is automatically created on first run with the `--upload` flag.
+3.  **Configure Database (Environment Variables):**
+    By default, the project uses a local file named `youtube_data.duckdb`. To use a remote Postgres database, set the following:
+    ```bash
+    export POSTGRES_HOST="your-host.pooler.supabase.com"
+    export POSTGRES_PORT="5432"
+    export POSTGRES_DATABASE="your-db-name"
+    export POSTGRES_USER="your-user"
+    export POSTGRES_PASSWORD="your-password"
+    ```
 
 ## Tools & Usage
 
-### 1. List Transcripts & Metadata (`youtube_api.py`)
+### 1. Database Management (`database.py` & `load_data.py`)
 
-Discover available transcripts for a video or search for videos by topic. Can save metadata to DuckDB.
+- `database.py`: Contains SQLAlchemy models and connection logic.
+- `load_data.py`: Handles upserting video and transcript metadata.
+
+### 2. List Transcripts & Metadata (`youtube_api.py`)
+
+Discover available transcripts or search by topic.
 
 **Single Video:**
 ```bash
-# Get JSON info for a video (supports URL or ID)
+# Get JSON info for a video
 uv run youtube_api.py EMd3H0pNvSE
 
-# Include full transcript text
-uv run youtube_api.py EMd3H0pNvSE --transcript
-
-# Upload metadata to DuckDB
+# Upload metadata to configured DB
 uv run youtube_api.py EMd3H0pNvSE --upload
 ```
 
 **Topic Search:**
 ```bash
-# Search and process multiple videos
-uv run youtube_api.py --topic "python tutorial" --max-results 3
-
-# Search and upload metadata for all results
-uv run youtube_api.py --topic "machine learning" --max-results 5 --upload
+# Search and upload metadata for multiple tutorials
+uv run youtube_api.py --topic "python tutorial" --max-results 5 --upload
 ```
 
-### 2. Fetch Full Transcript Text (`youtube_mcp.py`)
+### 3. Fetch Full Transcript (`youtube_mcp.py`)
 
-Fetches the full transcript text (using the MCP server) and can upload it to the database. Supports both full URLs and Video IDs.
+Fetches full transcript text via MCP and uploads it to the database.
 
 ```bash
-# Show usage instructions
-uv run youtube_mcp.py
-
-# Fetch info only (no transcript)
-uv run youtube_mcp.py EMd3H0pNvSE --info
-
-# Fetch transcript text
-uv run youtube_mcp.py "https://www.youtube.com/watch?v=VIDEO_ID" --transcript
-
-# Fetch and UPLOAD full transcript to DuckDB
+# Fetch and UPLOAD full transcript
 uv run youtube_mcp.py EMd3H0pNvSE --upload
-
-# Verbose mode (debug logs)
-uv run youtube_mcp.py EMd3H0pNvSE --upload --verbose
 ```
 
-## Database Schema (`youtube_data.duckdb`)
+### 4. Preview Data (`db_list.py`)
 
-**Table: `videos`**
-- `video_id` (PK)
-- `url`
-- `title`
-- `description`
-- `author`
-- `view_count`
-- `duration` (ISO 8601 format, e.g., PT2M50S)
-- `fetched_at`
+A utility to preview stored videos and transcripts in a tabular format.
 
-**Table: `transcripts`**
-- `video_id` (FK)
-- `language`
-- `language_code`
-- `is_generated`
-- `is_translatable`
-- `transcript` (Full text content)
+```bash
+uv run python db_list.py
+```
+
+## Database Schema
+
+The pipeline manages two primary tables:
+
+- **`videos`**: Stores core metadata (ID, title, author, view count, duration).
+- **`transcripts`**: Stores transcript availability and full text content.
 
 ## Complete Workflow Example
 
-1.  **Search for videos and save their metadata:**
+1.  **Configure Environment:**
     ```bash
-    export YOUTUBE_API_KEY="your_api_key"
-    uv run youtube_api.py --topic "DuckDB tutorial" --max-results 3 --upload
+    export YOUTUBE_API_KEY="AIza..."
+    # (Optional) Export POSTGRES_HOST... for Supabase
     ```
 
-2.  **Pick a video ID from the output and download its full transcript:**
+2.  **Initialize & Load Metadata:**
     ```bash
-    uv run youtube_mcp.py CHY-7K_y8_g --upload
+    uv run youtube_api.py --topic "AI engineering" --max-results 3 --upload
     ```
 
-3.  **Query the data:**
+3.  **Fetch Full Transcripts:**
     ```bash
-    uv run python3 -c "import duckdb; con=duckdb.connect('youtube_data.duckdb'); con.sql('SELECT title, duration, length(transcript) as char_count FROM videos JOIN transcripts ON videos.video_id = transcripts.video_id').show()"
+    # Run for a specific video ID found in the search
+    uv run youtube_mcp.py VIDEO_ID --upload
+    ```
+
+4.  **Verify Results:**
+    ```bash
+    uv run python db_list.py
     ```
