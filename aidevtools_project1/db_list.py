@@ -1,25 +1,33 @@
-import duckdb
+from database import get_engine
+import pandas as pd
+from sqlalchemy import text
 
 def preview_db():
-    conn = duckdb.connect('youtube_data.duckdb', read_only=True)
+    engine = get_engine()
     
-    # SQL extracted from db.ipynb (cell 14)
-    sql = """
+    sql = text("""
     SELECT 
         v.video_id, 
         v.url, 
         v.title, 
         t.language, 
         t.is_generated, 
-        len(t.transcript) as transcript_length, 
-        t.transcript[:100] as preview 
+        LENGTH(t.transcript) as transcript_length, 
+        SUBSTRING(t.transcript, 1, 100) as preview 
     FROM videos v 
     JOIN transcripts t ON v.video_id = t.video_id
-    """
+    """)
     
     print("--- Database Preview ---")
-    conn.sql(sql).show()
-    conn.close()
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(sql, conn)
+            if not df.empty:
+                print(df.to_string())
+            else:
+                print("No data found.")
+    except Exception as e:
+        print(f"Error querying database: {e}")
 
 if __name__ == "__main__":
     preview_db()

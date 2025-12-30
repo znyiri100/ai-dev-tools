@@ -26,7 +26,7 @@ def print_usage():
     print("\nOptions:")
     print("  --info         Fetch and display video information")
     print("  --transcript   Fetch and display the video transcript")
-    print("  --upload       Upload fetched transcript text to DuckDB")
+    print("  --upload       Upload fetched transcript text to Database")
     print("  --verbose      Show internal logs and progress messages")
     print("\nExample:")
     print(f"  uv run youtube_mcp.py {DEFAULT_VIDEO_URL} --info --transcript --upload")
@@ -113,22 +113,22 @@ async def main():
                     
                     if upload:
                         try:
-                            import load_to_duckdb
+                            import load_data
+                            from database import get_session, init_db
+                            
                             video_id = extract_video_id(video_url)
-                            con = load_to_duckdb.get_db_connection()
                             
                             # Initialize tables to ensure they exist
-                            load_to_duckdb.init_db(con)
+                            init_db()
+                            session_db = get_session()
                             
                             # We update the 'en' transcript by default. 
-                            # Since we don't know if it's generated or not for sure from the tool, 
-                            # we'll try to update the manual one first, then the generated one.
-                            load_to_duckdb.update_transcript_text(con, video_id, 'en', False, transcript_text)
-                            load_to_duckdb.update_transcript_text(con, video_id, 'en', True, transcript_text)
-                            con.close()
-                            print(f"✓ Transcript text uploaded to DuckDB for {video_id}", file=sys.stderr)
-                        except ImportError:
-                            print("Error: load_to_duckdb.py not found.", file=sys.stderr)
+                            load_data.update_transcript_text(session_db, video_id, 'en', False, transcript_text)
+                            
+                            session_db.close()
+                            print(f"✓ Transcript text uploaded to Database for {video_id}", file=sys.stderr)
+                        except ImportError as ie:
+                            print(f"Error: load_data.py not found. {ie}", file=sys.stderr)
                         except Exception as db_e:
                             print(f"Error uploading to DB: {db_e}", file=sys.stderr)
 
