@@ -1,0 +1,20 @@
+[project]
+name = "aidevtools-project1"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11.9"
+dependencies = [
+    "browser-cookie3>=0.20.1",
+    "duckdb>=1.4.3",
+    "duckdb-engine>=0.17.0",
+    "google-api-python-client>=2.187.0",
+    "ipython-sql>=0.5.0",
+    "marimo>=0.18.4",
+    "mcp>=1.25.0",
+    "pandas>=2.3.3",
+    "pyzmq>=27.1.0",
+    "requests>=2.32.5",
+    "sqlalchemy>=2.0.45",
+    "youtube-transcript-api>=1.2.3",
+]
