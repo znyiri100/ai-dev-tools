@@ -1,0 +1,11 @@
+[project]
+name = "homework"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11.9"
+dependencies = [
+    "fastmcp>=2.14.1",
+    "minsearch>=0.0.7",
+    "requests>=2.32.5",
+]
