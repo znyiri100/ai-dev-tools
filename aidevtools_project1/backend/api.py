@@ -67,18 +67,14 @@ def get_video_info(video_id: str, include_transcript: bool = False):
     return data
 
 @app.post("/api/v1/video/{video_id}/store", response_model=StoreResponse)
-def store_video_data(video_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def store_video_data(video_id: str, include_transcript: bool = True, background_tasks: BackgroundTasks = None, db: Session = Depends(get_db)):
     """
     Fetch data from YouTube and store it in the database.
-    This happens in the background? No, let's do it synchronously for simplicity, 
-    or use background tasks if it takes too long. 
-    Given it's a prototype, synchronous is fine for immediate feedback, 
-    but fetching transcripts can be slow. Let's do it synchronously to return success/fail.
     """
     real_id = youtube_api.extract_video_id(video_id)
     
     # Fetch data
-    data = youtube_api.list_transcripts_json(real_id, include_transcript=True) # Store usually implies full content
+    data = youtube_api.list_transcripts_json(real_id, include_transcript=include_transcript)
     
     if "error" in data:
         raise HTTPException(status_code=400, detail=data["error"])
@@ -106,6 +102,38 @@ def list_stored_videos(db: Session = Depends(get_db)):
             "fetched_at": v.fetched_at
         })
     return results
+
+@app.get("/api/v1/db/video/{video_id}", response_model=VideoResponse)
+def get_stored_video(video_id: str, db: Session = Depends(get_db)):
+    """
+    Retrieve a specific video and its transcripts from the database.
+    """
+    video = db.query(DbVideo).filter(DbVideo.video_id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found in DB")
+    
+    ts = []
+    for t in video.transcripts:
+        ts.append({
+            "language": t.language,
+            "language_code": t.language_code,
+            "is_generated": t.is_generated,
+            "is_translatable": t.is_translatable,
+            "transcript": t.transcript
+        })
+        
+    return {
+        "video_id": video.video_id,
+        "url": video.url,
+        "metadata": {
+            "title": video.title,
+            "description": video.description,
+            "author": video.author,
+            "view_count": video.view_count,
+            "duration": video.duration
+        },
+        "transcripts": ts
+    }
 
 if __name__ == "__main__":
     import uvicorn
