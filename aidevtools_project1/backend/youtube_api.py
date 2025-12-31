@@ -87,29 +87,12 @@ def get_transcript_text(transcript_obj):
     """Fetch transcript data and return the full text."""
     try:
         data = transcript_obj.fetch()
-        # snippets are objects with a .text attribute, but in fetch() result they are typically dicts if using the API directly,
-        # but the object wrapper might return objects. The original code used snippet.text.
-        # Let's verify: The snippet in `data` (list of dicts) usually has 'text' key. 
-        # But wait, youtube_transcript_api returns a list of dictionaries like [{'text': '...', 'start': ...}, ...]
-        # UNLESS using the Transcript object which might wrap it?
-        # The previous code: "snippets are objects with a .text attribute" -> suggests snippet.text access.
-        # Wait, looking at library docs: Transcript.fetch() returns a list of dictionaries.
-        # So it should be snippet['text'].
-        # However, the PREVIOUS code used snippet.text successfully (presumably). 
-        # Actually, let's look at the previous code again: `full_text = " ".join([snippet.text for snippet in data])`
-        # If it was working, then `data` items have `.text`.
-        # I'll stick to what was there but clean it up.
         full_text = " ".join([snippet['text'] for snippet in data])
         clean_text = " ".join(full_text.split())
         return clean_text
     except Exception as e:
-        # If accessing as dict fails, try attribute access (backward compatibility if previous code was correct/incorrect)
-        try:
-             full_text = " ".join([snippet.text for snippet in data])
-             clean_text = " ".join(full_text.split())
-             return clean_text
-        except:
-             return None
+        print(f"Error fetching transcript text: {e}", file=sys.stderr)
+        return None
 
 def list_transcripts_json(video_id: str, include_transcript: bool = False):
     """Retrieve all transcripts and return as a JSON-compatible dictionary."""

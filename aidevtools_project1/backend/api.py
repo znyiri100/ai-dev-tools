@@ -58,6 +58,7 @@ def get_video_info(video_id: str, include_transcript: bool = False):
     """
     Fetch video metadata and available transcripts directly from YouTube.
     """
+    print(f"DEBUG: API get_video_info video_id={video_id} include_transcript={include_transcript}")
     real_id = youtube_api.extract_video_id(video_id)
     data = youtube_api.list_transcripts_json(real_id, include_transcript=include_transcript)
     
