@@ -1,0 +1,349 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "YouTube Transcript API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/video/{video_id}": {
+      "get": {
+        "summary": "Get Video Info",
+        "description": "Fetch video metadata and available transcripts directly from YouTube.",
+        "operationId": "get_video_info_api_v1_video__video_id__get",
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Video Id"
+            }
+          },
+          {
+            "name": "include_transcript",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Transcript"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/video/{video_id}/store": {
+      "post": {
+        "summary": "Store Video Data",
+        "description": "Fetch data from YouTube and store it in the database.\nThis happens in the background? No, let's do it synchronously for simplicity, \nor use background tasks if it takes too long. \nGiven it's a prototype, synchronous is fine for immediate feedback, \nbut fetching transcripts can be slow. Let's do it synchronously to return success/fail.",
+        "operationId": "store_video_data_api_v1_video__video_id__store_post",
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Video Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/db/videos": {
+      "get": {
+        "summary": "List Stored Videos",
+        "description": "List all videos currently stored in the database.",
+        "operationId": "list_stored_videos_api_v1_db_videos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "StoreResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "video_id": {
+            "type": "string",
+            "title": "Video Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "video_id"
+        ],
+        "title": "StoreResponse"
+      },
+      "TranscriptInfo": {
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "language_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language Code"
+          },
+          "is_generated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Generated"
+          },
+          "is_translatable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Translatable"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          }
+        },
+        "type": "object",
+        "required": [
+          "language",
+          "language_code",
+          "is_generated",
+          "is_translatable"
+        ],
+        "title": "TranscriptInfo"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VideoMetadata": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "view_count": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View Count"
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "author",
+          "view_count",
+          "duration"
+        ],
+        "title": "VideoMetadata"
+      },
+      "VideoResponse": {
+        "properties": {
+          "video_id": {
+            "type": "string",
+            "title": "Video Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/VideoMetadata"
+          },
+          "transcripts": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptInfo"
+            },
+            "type": "array",
+            "title": "Transcripts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "video_id",
+          "url",
+          "metadata",
+          "transcripts"
+        ],
+        "title": "VideoResponse"
+      }
+    }
+  }
+}

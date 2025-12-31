@@ -81,6 +81,30 @@ A utility to preview stored videos and transcripts in a tabular format.
 uv run python db_list.py
 ```
 
+### 5. HTTP API (`api.py`)
+
+A FastAPI server that exposes the project's functionality as a REST API.
+
+**Start the Server:**
+```bash
+uv run api.py
+```
+
+**Documentation:**
+Once the server is running, you can access the interactive API documentation at:
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Redoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+**Key Endpoints:**
+- `GET /api/v1/video/{video_id}`: Get video info live from YouTube.
+- `POST /api/v1/video/{video_id}/store`: Fetch and store video data in DB.
+- `GET /api/v1/db/videos`: List videos stored in DB.
+
+**Run Tests:**
+```bash
+uv run -m pytest tests/test_api.py
+```
+
 ## Database Schema
 
 The pipeline manages two primary tables:
