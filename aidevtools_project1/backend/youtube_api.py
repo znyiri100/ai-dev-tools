@@ -89,7 +89,17 @@ def get_transcript_text(transcript_obj):
     """Fetch transcript data and return the full text."""
     try:
         data = transcript_obj.fetch()
-        full_text = " ".join([snippet['text'] for snippet in data])
+        # Handle both dicts and objects (FetchedTranscriptSnippet)
+        text_list = []
+        for snippet in data:
+            if hasattr(snippet, 'text'):
+                text_list.append(snippet.text)
+            elif isinstance(snippet, dict):
+                text_list.append(snippet['text'])
+            else:
+                text_list.append(str(snippet))
+                
+        full_text = " ".join(text_list)
         clean_text = " ".join(full_text.split())
         return clean_text
     except Exception as e:
@@ -129,22 +139,33 @@ def list_transcripts_json(video_id: str, include_transcript: bool = False):
         else:
             api = YouTubeTranscriptApi()
 
-        transcript_list = api.list(video_id)
+        try:
+            transcript_list = api.list(video_id)
 
-        for transcript in transcript_list:
-            t_info = {
-                "language": transcript.language,
-                "language_code": transcript.language_code,
-                "is_generated": transcript.is_generated,
-                "is_translatable": transcript.is_translatable,
-            }
-            
-            if include_transcript:
-                t_info["transcript"] = get_transcript_text(transcript)
+            for transcript in transcript_list:
+                t_info = {
+                    "language": transcript.language,
+                    "language_code": transcript.language_code,
+                    "is_generated": transcript.is_generated,
+                    "is_translatable": transcript.is_translatable,
+                }
                 
-            result["transcripts"].append(t_info)
+                if include_transcript:
+                    t_info["transcript"] = get_transcript_text(transcript)
+                    
+                result["transcripts"].append(t_info)
+        except Exception as e:
+            # Capturing transcript-specific errors in the transcripts list
+            result["transcripts"].append({
+                "language": "Transcript Error",
+                "language_code": "error",
+                "is_generated": False,
+                "is_translatable": False,
+                "transcript": f"Error retrieving transcripts: {str(e)}"
+            })
 
     except Exception as e:
+        # Setup errors (e.g. proxy configuration)
         result["error"] = {
             "type": type(e).__name__,
             "message": str(e)
