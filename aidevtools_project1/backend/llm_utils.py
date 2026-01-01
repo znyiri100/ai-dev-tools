@@ -30,22 +30,33 @@ def configure_genai():
         raise ValueError("GOOGLE_API_KEY environment variable not set.")
     genai.configure(api_key=api_key)
 
-def generate_content(prompt_template: str, transcript: str) -> str:
+def generate_content(prompt_template: str, transcript: str, custom_prompt: Optional[str] = None) -> str:
     try:
         configure_genai()
         model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content(prompt_template.format(transcript=transcript))
+        
+        # If custom prompt is provided, use it. Otherwise use the template.
+        # Note: The template expects {transcript}. A custom prompt might not have it formatted, 
+        # so we should probably append the transcript or expect the user to include it?
+        # Better approach: The custom prompt replaces the *Instruction* part.
+        
+        if custom_prompt:
+             final_prompt = f"{custom_prompt}\n\nTranscript:\n{transcript}"
+        else:
+             final_prompt = prompt_template.format(transcript=transcript)
+
+        response = model.generate_content(final_prompt)
         return response.text
     except ValueError as ve:
         return f"Error: {str(ve)}"
     except Exception as e:
         return f"Error generating content: {str(e)}"
 
-def generate_study_guide(transcript: str) -> str:
-    return generate_content(STUDY_GUIDE_PROMPT, transcript)
+def generate_study_guide(transcript: str, prompt: Optional[str] = None) -> str:
+    return generate_content(STUDY_GUIDE_PROMPT, transcript, prompt)
 
-def generate_quiz(transcript: str) -> str:
-    return generate_content(QUIZ_PROMPT, transcript)
+def generate_quiz(transcript: str, prompt: Optional[str] = None) -> str:
+    return generate_content(QUIZ_PROMPT, transcript, prompt)
 
 CHAT_SYSTEM_PROMPT = """You are a friendly and highly capable research assistant and tutor.
 Your goal is to help the user understand the SOURCE MATERIAL which is from a transcript of a video.

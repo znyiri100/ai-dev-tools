@@ -207,8 +207,8 @@ css = """
 }
 """
 
-with gr.Blocks(title="YouTube Transcript Manager") as app:
-    gr.Markdown("# YouTube Transcript Manager")
+with gr.Blocks(title="Learnify") as app:
+    gr.Markdown("# Learnify")
     
     with gr.Tab("Search & Store"):
         # --- Component Definitions ---

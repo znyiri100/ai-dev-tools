@@ -1,4 +1,4 @@
-# YouTube Transcript Manager
+# Learnify
 
 This project consists of a FastAPI backend for processing YouTube transcripts and multiple frontend GUI options.
 

@@ -276,7 +276,7 @@ wheels = [
 ]
 
 [[package]]
-name = "frontend"
+name = "frontendi-flet"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

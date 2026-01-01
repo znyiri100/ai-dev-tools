@@ -1,4 +1,4 @@
-# YouTube Transcript Manager GUI
+# Learnify GUI
 
 A Flet-based desktop/web GUI for the YouTube Transcript API.
 

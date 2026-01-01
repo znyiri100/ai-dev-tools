@@ -84,8 +84,44 @@ def chat_with_study_guide_endpoint(video_id: str, language_code: str, request: C
     
     return {"message": "Chat response generated", "content": content}
 
+class GenerateRequest(BaseModel):
+    prompt: Optional[str] = None
+
+class UpdateContentRequest(BaseModel):
+    study_guide: Optional[str] = None
+    quiz: Optional[str] = None
+
+@app.put("/api/v1/transcript/{video_id}/{language_code}/update")
+def update_transcript_content(
+    video_id: str, 
+    language_code: str, 
+    request: UpdateContentRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Update study guide and/or quiz content for a transcript without regenerating.
+    """
+    transcript = db.query(DbTranscript).filter(
+        DbTranscript.video_id == video_id,
+        DbTranscript.language_code == language_code
+    ).order_by(DbTranscript.is_generated.desc()).first()
+    
+    if not transcript:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+    
+    # Update fields if provided
+    if request.study_guide is not None:
+        transcript.study_guide = request.study_guide
+    if request.quiz is not None:
+        transcript.quiz = request.quiz
+    
+    db.commit()
+    
+    return {"message": "Content updated successfully"}
+
+
 @app.post("/api/v1/transcript/{video_id}/{language_code}/generate_study_guide", response_model=GenerateResponse)
-def generate_study_guide_endpoint(video_id: str, language_code: str, db: Session = Depends(get_db)):
+def generate_study_guide_endpoint(video_id: str, language_code: str, request: GenerateRequest = None, db: Session = Depends(get_db)):
     # Order by is_generated descending so True (1) comes before False (0)
     transcript = db.query(DbTranscript).filter(
         DbTranscript.video_id == video_id,
@@ -98,7 +134,8 @@ def generate_study_guide_endpoint(video_id: str, language_code: str, db: Session
     if not transcript.transcript:
          raise HTTPException(status_code=400, detail="Transcript text is empty")
 
-    content = llm_utils.generate_study_guide(transcript.transcript)
+    prompt = request.prompt if request else None
+    content = llm_utils.generate_study_guide(transcript.transcript, prompt=prompt)
     
     if content.startswith("Error"):
          raise HTTPException(status_code=500, detail=content)
@@ -109,7 +146,7 @@ def generate_study_guide_endpoint(video_id: str, language_code: str, db: Session
     return {"message": "Study Guide generated successfully", "content": content}
 
 @app.post("/api/v1/transcript/{video_id}/{language_code}/generate_quiz", response_model=GenerateResponse)
-def generate_quiz_endpoint(video_id: str, language_code: str, db: Session = Depends(get_db)):
+def generate_quiz_endpoint(video_id: str, language_code: str, request: GenerateRequest = None, db: Session = Depends(get_db)):
     # Order by is_generated descending so True (1) comes before False (0)
     transcript = db.query(DbTranscript).filter(
         DbTranscript.video_id == video_id,
@@ -122,7 +159,8 @@ def generate_quiz_endpoint(video_id: str, language_code: str, db: Session = Depe
     if not transcript.transcript:
          raise HTTPException(status_code=400, detail="Transcript text is empty")
 
-    content = llm_utils.generate_quiz(transcript.transcript)
+    prompt = request.prompt if request else None
+    content = llm_utils.generate_quiz(transcript.transcript, prompt=prompt)
 
     if content.startswith("Error"):
          raise HTTPException(status_code=500, detail=content)

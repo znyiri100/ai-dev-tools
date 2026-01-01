@@ -4,7 +4,7 @@ import httpx
 API_BASE = "http://localhost:8000"
 
 def main(page: ft.Page):
-    page.title = "YouTube Transcript Manager"
+    page.title = "Learnify"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.window.width = 1000
     page.window.height = 800
