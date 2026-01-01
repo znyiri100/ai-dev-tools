@@ -7,7 +7,16 @@ STUDY_GUIDE_PROMPT = """You are a highly capable research assistant and tutor. C
 Transcript:
 {transcript}"""
 
-QUIZ_PROMPT = """Generate a Quiz with 5 questions, 4 multiple choice answers each, based on the transcript.
+QUIZ_PROMPT = """Generate a quiz with 5 multiple choice questions based on the transcript.
+Return the result strictly as a valid JSON array of objects.
+Each object must have the following structure:
+{{
+    "question": "The question text",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct_answer": "The text of the correct option (must match one of the options exactly)",
+    "explanation": "Brief explanation of why this is correct"
+}}
+Return ONLY the JSON array. Do not include any markdown formatting (like ```json ... ```), no preamble, and no postscript.
 
 Transcript:
 {transcript}"""

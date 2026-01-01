@@ -207,7 +207,7 @@ css = """
 }
 """
 
-with gr.Blocks(title="YouTube Transcript Manager", css=css) as app:
+with gr.Blocks(title="YouTube Transcript Manager") as app:
     gr.Markdown("# YouTube Transcript Manager")
     
     with gr.Tab("Search & Store"):
@@ -338,20 +338,197 @@ with gr.Blocks(title="YouTube Transcript Manager", css=css) as app:
                     description="I am your friendly research assistant. Ask me anything about the selected study material!"
                 )
 
+    with gr.Tab("Interactive Quiz"):
+        gr.Markdown("### Interactive Quiz")
+        
+        # State variables for Quiz
+        quiz_state = gr.State([]) # List of dicts
+        current_q_index = gr.State(0)
+        user_score = gr.State(0)
+        
+        with gr.Group(visible=False) as quiz_container:
+            quiz_progress = gr.Markdown("Question 1 / 5")
+            quiz_score_display = gr.Markdown("Score: 0")
+            
+            with gr.Row():
+                quiz_question = gr.Markdown("Question Text Here", elem_classes=["scrollable-markdown"])
+            
+            quiz_options = gr.Radio(label="Select an Option", interactive=True)
+            
+            with gr.Row():
+                btn_submit_answer = gr.Button("Submit Answer", variant="primary")
+                btn_next_question = gr.Button("Next Question", visible=False)
+            
+            quiz_feedback = gr.Markdown(visible=False)
+        
+        quiz_message = gr.Markdown("Select a video and generate a quiz to start.")
+
+        def load_interactive_quiz(video_id, quiz_text):
+            if not video_id or not quiz_text:
+                return (
+                    [], 0, 0, # states
+                    gr.update(visible=False), # container
+                    gr.update(value="Please select a video with a generated quiz."), # message
+                    "", "", "", gr.update(choices=[]), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False) # components
+                )
+            
+            try:
+                # Try to parse JSON
+                # Sometimes the LLM might wrap it in ```json ... ``` or just ``` ... ```
+                cleaned_text = quiz_text.strip()
+                if cleaned_text.startswith("```json"):
+                    cleaned_text = cleaned_text[7:]
+                elif cleaned_text.startswith("```"):
+                    cleaned_text = cleaned_text[3:]
+                
+                if cleaned_text.endswith("```"):
+                    cleaned_text = cleaned_text[:-3]
+                
+                cleaned_text = cleaned_text.strip()
+                
+                # Attempt to find the first [ and last ]
+                start_idx = cleaned_text.find("[")
+                end_idx = cleaned_text.rfind("]")
+                
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    cleaned_text = cleaned_text[start_idx:end_idx+1]
+                
+                quiz_data = json.loads(cleaned_text)
+                
+                if not isinstance(quiz_data, list) or not quiz_data:
+                     # Fallback for text-based quiz or empty
+                     return (
+                        [], 0, 0,
+                        gr.update(visible=False),
+                        gr.update(value="This quiz format is not supported for interactive mode (it might be text-only). Please re-generate the quiz."),
+                        "", "", "", gr.update(choices=[]), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+                     )
+
+                # Initialize first question
+                q0 = quiz_data[0]
+                question_text = f"**{q0.get('question')}**"
+                options = q0.get("options", [])
+                
+                return (
+                    quiz_data, 0, 0, # states
+                    gr.update(visible=True), # container
+                    gr.update(visible=False), # message
+                    f"Question 1 / {len(quiz_data)}", # progress
+                    "Score: 0", # score
+                    question_text, # question
+                    gr.update(choices=options, value=None, interactive=True), # options
+                    gr.update(visible=True), # submit btn
+                    gr.update(visible=False), # next btn
+                    gr.update(visible=False, value="") # feedback
+                )
+
+            except json.JSONDecodeError:
+                return (
+                    [], 0, 0,
+                    gr.update(visible=False),
+                    gr.update(value="Could not parse quiz JSON. Please re-generate the quiz."),
+                    "", "", "", gr.update(choices=[]), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+                )
+
+        def submit_answer(quiz_data, idx, score, selected_option):
+            if idx >= len(quiz_data) or not selected_option:
+                return score, gr.update(visible=True), gr.update(visible=False), gr.update(visible=False) # No change
+
+            q = quiz_data[idx]
+            correct_answer = q.get("correct_answer")
+            explanation = q.get("explanation", "")
+            
+            is_correct = (selected_option == correct_answer)
+            new_score = score + 1 if is_correct else score
+            
+            feedback_text = ""
+            if is_correct:
+                feedback_text = f"✅ **Correct!**\n\n{explanation}"
+            else:
+                feedback_text = f"❌ **Incorrect.**\n\nThe correct answer is: **{correct_answer}**\n\n{explanation}"
+            
+            return (
+                new_score,
+                f"Score: {new_score}",
+                gr.update(visible=False), # Hide submit
+                gr.update(visible=True), # Show next
+                gr.update(visible=True, value=feedback_text), # Show feedback
+                gr.update(interactive=False) # Disable options
+            )
+
+        def next_question(quiz_data, idx, score):
+            new_idx = idx + 1
+            if new_idx >= len(quiz_data):
+                # End of quiz
+                return (
+                    new_idx,
+                    f"Quiz Complete! Final Score: {score} / {len(quiz_data)}",
+                    "", # Score display (merged into progress)
+                    "**Quiz Completed!**", 
+                    gr.update(visible=False), # options
+                    gr.update(visible=False), # submit
+                    gr.update(visible=False), # next
+                    gr.update(visible=False) # feedback
+                )
+            
+            q = quiz_data[new_idx]
+            question_text = f"**{q.get('question')}**"
+            options = q.get("options", [])
+            
+            return (
+                new_idx,
+                f"Question {new_idx + 1} / {len(quiz_data)}",
+                f"Score: {score}",
+                question_text,
+                gr.update(visible=True, choices=options, value=None, interactive=True),
+                gr.update(visible=True), # submit
+                gr.update(visible=False), # next
+                gr.update(visible=False, value="") # feedback
+            )
+
+        btn_submit_answer.click(
+            submit_answer,
+            [quiz_state, current_q_index, user_score, quiz_options],
+            [user_score, quiz_score_display, btn_submit_answer, btn_next_question, quiz_feedback, quiz_options]
+        )
+        
+        btn_next_question.click(
+            next_question,
+            [quiz_state, current_q_index, user_score],
+            [current_q_index, quiz_progress, quiz_score_display, quiz_question, quiz_options, btn_submit_answer, btn_next_question, quiz_feedback]
+        )
+
     # --- Global Event Handlers linking tabs ---
     
     def on_select_video(evt: gr.SelectData):
         if not evt.row_value:
-            return "", "", "", "", "", "", ""
+            # Return empty for all outputs
+            # Targets: db_vid_input, out_vid_display, out_db_detail, out_db_transcript, out_study_guide, out_quiz, chat_sg_display
+            # AND Interactive Quiz inputs: quiz_state, current_q_index, user_score, quiz_container, quiz_message, quiz_progress, quiz_score_display, quiz_options, btn_submit_answer, btn_next_question, quiz_feedback
+            # Use a wrapper function to handle the complex return?
+            pass # The logic below is easier if we just define the output count correctly.
+        
         vid = evt.row_value[0]
         json_data, txt, sg, qz = get_db_video_detail(vid)
-        # Returns: db_vid_input, out_vid_display, out_db_detail, out_db_transcript, out_study_guide, out_quiz, chat_sg_display
-        return vid, vid, json_data, txt, sg, qz, sg
+        
+        # Load Quiz Logic inline or call helper
+        # We need to return values for the Quiz Tab components too
+        # load_interactive_quiz returns: (quiz_data, idx, score, container_update, message_update, progress, score_txt, q_txt, options_update, submit_update, next_update, feedback_update)
+        
+        q_data, q_idx, q_score, q_cont, q_msg, q_prog, q_score_disp, q_q, q_opt, q_sub, q_nxt, q_feed = load_interactive_quiz(vid, qz)
+        
+        return (
+            vid, vid, json_data, txt, sg, qz, sg, # Existing tab outputs
+            q_data, q_idx, q_score, q_cont, q_msg, q_prog, q_score_disp, q_q, q_opt, q_sub, q_nxt, q_feed # Quiz tab outputs
+        )
 
     db_table.select(
         on_select_video, 
         None, 
-        [db_vid_input, out_vid_display, out_db_detail, out_db_transcript, out_study_guide, out_quiz, chat_sg_display]
+        [
+            db_vid_input, out_vid_display, out_db_detail, out_db_transcript, out_study_guide, out_quiz, chat_sg_display,
+            quiz_state, current_q_index, user_score, quiz_container, quiz_message, quiz_progress, quiz_score_display, quiz_question, quiz_options, btn_submit_answer, btn_next_question, quiz_feedback
+        ]
     )
     
     btn_gen_study.click(
@@ -360,7 +537,24 @@ with gr.Blocks(title="YouTube Transcript Manager", css=css) as app:
         [out_study_guide, chat_sg_display]
     )
     
-    btn_gen_quiz.click(generate_quiz, [db_vid_input, out_db_detail], out_quiz)
+    # When quiz is generated, also reload the interactive quiz tab
+    def on_gen_quiz_click(vid, detail):
+        qz_content = generate_quiz(vid, detail)
+        # return qz content for markdown view AND interactive quiz components
+        q_data, q_idx, q_score, q_cont, q_msg, q_prog, q_score_disp, q_q, q_opt, q_sub, q_nxt, q_feed = load_interactive_quiz(vid, qz_content)
+        return (
+            qz_content, 
+            q_data, q_idx, q_score, q_cont, q_msg, q_prog, q_score_disp, q_q, q_opt, q_sub, q_nxt, q_feed
+        )
+
+    btn_gen_quiz.click(
+        on_gen_quiz_click, 
+        [db_vid_input, out_db_detail], 
+        [
+            out_quiz,
+            quiz_state, current_q_index, user_score, quiz_container, quiz_message, quiz_progress, quiz_score_display, quiz_question, quiz_options, btn_submit_answer, btn_next_question, quiz_feedback
+        ]
+    )
 
 if __name__ == "__main__":
-    app.launch()
+    app.launch(css=css)
