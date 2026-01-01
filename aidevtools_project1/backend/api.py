@@ -32,6 +32,8 @@ class TranscriptInfo(BaseModel):
     is_generated: Optional[bool]
     is_translatable: Optional[bool]
     transcript: Optional[str] = None
+    study_guide: Optional[str] = None
+    quiz: Optional[str] = None
 
 class VideoResponse(BaseModel):
     video_id: str
@@ -43,6 +45,10 @@ class StoreResponse(BaseModel):
     message: str
     video_id: str
 
+class GenerateResponse(BaseModel):
+    message: str
+    content: str
+
 # --- Dependency ---
 def get_db():
     db = get_session()
@@ -51,6 +57,80 @@ def get_db():
     finally:
         db.close()
 
+import llm_utils
+
+class ChatRequest(BaseModel):
+    message: str
+    history: List[Dict[str, Any]]
+
+@app.post("/api/v1/transcript/{video_id}/{language_code}/chat", response_model=GenerateResponse)
+def chat_with_study_guide_endpoint(video_id: str, language_code: str, request: ChatRequest, db: Session = Depends(get_db)):
+    # Order by is_generated descending to match generation priority
+    transcript = db.query(DbTranscript).filter(
+        DbTranscript.video_id == video_id,
+        DbTranscript.language_code == language_code
+    ).order_by(DbTranscript.is_generated.desc()).first()
+    
+    if not transcript:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+    
+    if not transcript.study_guide:
+        raise HTTPException(status_code=400, detail="Study guide not generated yet. Please generate it first.")
+
+    content = llm_utils.chat_with_study_guide(transcript.study_guide, request.message, request.history)
+    
+    if content.startswith("Error"):
+        raise HTTPException(status_code=500, detail=content)
+    
+    return {"message": "Chat response generated", "content": content}
+
+@app.post("/api/v1/transcript/{video_id}/{language_code}/generate_study_guide", response_model=GenerateResponse)
+def generate_study_guide_endpoint(video_id: str, language_code: str, db: Session = Depends(get_db)):
+    # Order by is_generated descending so True (1) comes before False (0)
+    transcript = db.query(DbTranscript).filter(
+        DbTranscript.video_id == video_id,
+        DbTranscript.language_code == language_code
+    ).order_by(DbTranscript.is_generated.desc()).first()
+    
+    if not transcript:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+        
+    if not transcript.transcript:
+         raise HTTPException(status_code=400, detail="Transcript text is empty")
+
+    content = llm_utils.generate_study_guide(transcript.transcript)
+    
+    if content.startswith("Error"):
+         raise HTTPException(status_code=500, detail=content)
+
+    transcript.study_guide = content
+    db.commit()
+    
+    return {"message": "Study Guide generated successfully", "content": content}
+
+@app.post("/api/v1/transcript/{video_id}/{language_code}/generate_quiz", response_model=GenerateResponse)
+def generate_quiz_endpoint(video_id: str, language_code: str, db: Session = Depends(get_db)):
+    # Order by is_generated descending so True (1) comes before False (0)
+    transcript = db.query(DbTranscript).filter(
+        DbTranscript.video_id == video_id,
+        DbTranscript.language_code == language_code
+    ).order_by(DbTranscript.is_generated.desc()).first()
+    
+    if not transcript:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+        
+    if not transcript.transcript:
+         raise HTTPException(status_code=400, detail="Transcript text is empty")
+
+    content = llm_utils.generate_quiz(transcript.transcript)
+
+    if content.startswith("Error"):
+         raise HTTPException(status_code=500, detail=content)
+    
+    transcript.quiz = content
+    db.commit()
+    
+    return {"message": "Quiz generated successfully", "content": content}
 
 
 @app.get("/api/v1/video/{video_id}", response_model=VideoResponse)
@@ -120,7 +200,9 @@ def get_stored_video(video_id: str, db: Session = Depends(get_db)):
             "language_code": t.language_code,
             "is_generated": t.is_generated,
             "is_translatable": t.is_translatable,
-            "transcript": t.transcript
+            "transcript": t.transcript,
+            "study_guide": t.study_guide,
+            "quiz": t.quiz
         })
         
     return {

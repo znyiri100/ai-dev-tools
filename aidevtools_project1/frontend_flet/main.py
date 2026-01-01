@@ -19,7 +19,7 @@ def main(page: ft.Page):
         snack_bar.update()
 
     # --- Shared Logic ---
-    def create_video_info_controls(data):
+    def create_video_info_controls(data, is_stored=False, video_id=None):
         meta = data.get("metadata", {})
         transcripts = data.get("transcripts", [])
         
@@ -71,16 +71,89 @@ def main(page: ft.Page):
             if txt:
                 has_text = True
                 lang = t.get("language", "Unknown")
+                lang_code = t.get("language_code")
+                
+                # Content Controls
+                content_col = [
+                    ft.Container(
+                        content=ft.Text(txt, selectable=True),
+                        padding=10,
+                        height=300,
+                        border=ft.border.all(1, ft.colors.OUTLINE),
+                        border_radius=5
+                    )
+                ]
+                
+                if is_stored and video_id and lang_code:
+                    # Generators
+                    
+                    def on_gen_study_click(e, vid=video_id, lc=lang_code):
+                        try:
+                            show_message("Generating Study Guide... please wait.")
+                            with httpx.Client(timeout=60.0) as client:
+                                resp = client.post(f"{API_BASE}/api/v1/transcript/{vid}/{lc}/generate_study_guide")
+                                if resp.status_code == 200:
+                                    show_message("Study Guide Generated!")
+                                    # Refresh details
+                                    if page.dialog and page.dialog.open:
+                                        # This is a bit hacky, but we call the show_db_detail again
+                                        show_db_detail(vid)
+                                else:
+                                    show_message(f"Error: {resp.text}")
+                        except Exception as ex:
+                            show_message(f"Error: {ex}")
+
+                    def on_gen_quiz_click(e, vid=video_id, lc=lang_code):
+                        try:
+                            show_message("Generating Quiz... please wait.")
+                            with httpx.Client(timeout=60.0) as client:
+                                resp = client.post(f"{API_BASE}/api/v1/transcript/{vid}/{lc}/generate_quiz")
+                                if resp.status_code == 200:
+                                    show_message("Quiz Generated!")
+                                    # Refresh details
+                                    if page.dialog and page.dialog.open:
+                                        show_db_detail(vid)
+                                else:
+                                    show_message(f"Error: {resp.text}")
+                        except Exception as ex:
+                             show_message(f"Error: {ex}")
+
+                    content_col.append(
+                        ft.Row([
+                            ft.ElevatedButton("Generate Study Guide", on_click=on_gen_study_click),
+                            ft.ElevatedButton("Generate Quiz", on_click=on_gen_quiz_click)
+                        ], spacing=10)
+                    )
+                    
+                    # Display Generated Content
+                    study_guide = t.get("study_guide")
+                    if study_guide:
+                        content_col.append(ft.Text("Study Guide:", weight=ft.FontWeight.BOLD))
+                        content_col.append(
+                             ft.Container(
+                                content=ft.Markdown(study_guide, selectable=True),
+                                padding=10,
+                                bgcolor=ft.colors.SURFACE_VARIANT,
+                                border_radius=5
+                            )
+                        )
+
+                    quiz = t.get("quiz")
+                    if quiz:
+                        content_col.append(ft.Text("Quiz:", weight=ft.FontWeight.BOLD))
+                        content_col.append(
+                             ft.Container(
+                                content=ft.Markdown(quiz, selectable=True),
+                                padding=10,
+                                bgcolor=ft.colors.SURFACE_VARIANT,
+                                border_radius=5
+                            )
+                        )
+
                 controls.append(
                     ft.ExpansionTile(
                         title=ft.Text(f"Transcript: {lang}"),
-                        controls=[
-                            ft.Container(
-                                content=ft.Text(txt, selectable=True),
-                                padding=10,
-                                height=300, 
-                            )
-                        ],
+                        controls=[ft.Container(content=ft.Column(content_col), padding=10)],
                         initially_expanded=False
                     )
                 )
@@ -155,7 +228,7 @@ def main(page: ft.Page):
                     dlg = ft.AlertDialog(
                         title=ft.Text("Video Details"),
                         content=ft.Container(
-                            content=ft.Column(create_video_info_controls(data), scroll=ft.ScrollMode.AUTO),
+                            content=ft.Column(create_video_info_controls(data, is_stored=True, video_id=video_id), scroll=ft.ScrollMode.AUTO),
                             width=800, height=600 
                         )
                     )

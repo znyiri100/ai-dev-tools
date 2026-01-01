@@ -28,6 +28,8 @@ class Transcript(Base):
     is_generated = Column(Boolean, primary_key=True)
     is_translatable = Column(Boolean)
     transcript = Column(Text)
+    study_guide = Column(Text)
+    quiz = Column(Text)
 
     video = relationship("Video", back_populates="transcripts")
 
