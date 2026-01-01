@@ -26,8 +26,9 @@ uv run flet run --web main.py
 
 **Option B: Gradio GUI (Web)**
 ```bash
-cd frontend_gradio
-uv run main.py
+cd frontend_gradio && uv run main.py
+# with hot reload
+cd frontend_gradio && uv run gradio main.py
 ```
 
 ## Cloud Deployment (Google Cloud Run)
@@ -46,6 +47,19 @@ gcloud run deploy youtube-backend --source . --allow-unauthenticated
 cd frontend_gradio
 gcloud run deploy youtube-frontend --source . --allow-unauthenticated \
   --set-env-vars API_BASE_URL="[YOUR_BACKEND_URL]"
+```
+
+## Troubleshooting & Bypassing IP Blocks
+
+If you receive errors like "YouTube is blocking requests from your IP", you can use a proxy (e.g., Webshare).
+
+### Using a Proxy
+Set the `HTTP_PROXY` environment variable before running the backend or CLI scripts:
+
+```bash
+export HTTP_PROXY="http://user:pass@proxy-host:port"
+# Run backend
+cd backend && uv run api.py
 ```
 
 ## Features

@@ -215,18 +215,22 @@ wheels = [
 ]
 
 [[package]]
-name = "frontend2"
+name = "frontend-gradio"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "gradio" },
     { name = "httpx" },
+    { name = "youtube-search-python" },
+    { name = "yt-dlp" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "gradio", specifier = ">=6.2.0" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "youtube-search-python", specifier = ">=1.6.6" },
+    { name = "yt-dlp", specifier = ">=2025.12.8" },
 ]
 
 [[package]]
@@ -1172,4 +1176,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c3/d1/8f3c683c9561a4e6689dd3b1d345c815f10f86acd044ee1fb9a4dcd0b8c5/uvicorn-0.40.0.tar.gz", hash = "sha256:839676675e87e73694518b5574fd0f24c9d97b46bea16df7b8c05ea1a51071ea", size = 81761, upload-time = "2025-12-21T14:16:22.45Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3d/d8/2083a1daa7439a66f3a48589a57d576aa117726762618f6bb09fe3798796/uvicorn-0.40.0-py3-none-any.whl", hash = "sha256:c6c8f55bc8bf13eb6fa9ff87ad62308bbbc33d0b67f84293151efe87e0d5f2ee", size = 68502, upload-time = "2025-12-21T14:16:21.041Z" },
+]
+
+[[package]]
+name = "youtube-search-python"
+version = "1.6.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/91/3c/dc669b0308e49f294df67bddbb16ff3eefe5b5da6fa37ead922a8301926b/youtube-search-python-1.6.6.tar.gz", hash = "sha256:4568d1d769ecd7eb4bb8365f04eec6e364c5f70eec7b3765f543daebb135fcf5", size = 115732, upload-time = "2022-06-23T20:43:14.26Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/57/d4a20f04264fb5b52dbde127b87296578e12f6eabbfb5a16a6578812988e/youtube_search_python-1.6.6-py3-none-any.whl", hash = "sha256:f0d835278bc32335f2ded48ba119bef39cafb290d98648a64deb22f6c4a705f2", size = 89121, upload-time = "2022-06-23T20:43:11.455Z" },
+]
+
+[[package]]
+name = "yt-dlp"
+version = "2025.12.8"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/14/77/db924ebbd99d0b2b571c184cb08ed232cf4906c6f9b76eed763cd2c84170/yt_dlp-2025.12.8.tar.gz", hash = "sha256:b773c81bb6b71cb2c111cfb859f453c7a71cf2ef44eff234ff155877184c3e4f", size = 3088947, upload-time = "2025-12-08T00:16:01.649Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6e/2f/98c3596ad923f8efd32c90dca62e241e8ad9efcebf20831173c357042ba0/yt_dlp-2025.12.8-py3-none-any.whl", hash = "sha256:36e2584342e409cfbfa0b5e61448a1c5189e345cf4564294456ee509e7d3e065", size = 3291464, upload-time = "2025-12-08T00:15:58.556Z" },
 ]

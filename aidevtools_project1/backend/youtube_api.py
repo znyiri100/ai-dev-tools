@@ -18,6 +18,7 @@ import requests
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.api_core._python_version_support")
 
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 from youtube_transcript_api._errors import (
     TranscriptsDisabled,
     VideoUnavailable,
@@ -25,6 +26,7 @@ from youtube_transcript_api._errors import (
     NoTranscriptFound,
 )
 from googleapiclient.discovery import build
+from urllib.parse import urlparse
 
 def extract_video_id(input_string: str) -> str:
     """Extract video_id from a YouTube URL or return the input."""
@@ -91,8 +93,9 @@ def get_transcript_text(transcript_obj):
         clean_text = " ".join(full_text.split())
         return clean_text
     except Exception as e:
-        print(f"Error fetching transcript text: {e}", file=sys.stderr)
-        return None
+        error_msg = f"ERROR fetching transcript: {str(e)}"
+        print(error_msg, file=sys.stderr)
+        return error_msg
 
 def list_transcripts_json(video_id: str, include_transcript: bool = False):
     """Retrieve all transcripts and return as a JSON-compatible dictionary."""
@@ -104,7 +107,28 @@ def list_transcripts_json(video_id: str, include_transcript: bool = False):
     }
 
     try:
-        api = YouTubeTranscriptApi()
+        proxy_url = os.getenv("HTTP_PROXY")
+        api = None
+        
+        if proxy_url:
+            if "webshare.io" in proxy_url and "@" in proxy_url:
+                try:
+                    parsed = urlparse(proxy_url)
+                    api = YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
+                        proxy_username=parsed.username,
+                        proxy_password=parsed.password,
+                        domain_name=parsed.hostname,
+                        proxy_port=parsed.port or 80
+                    ))
+                except Exception as e:
+                    print(f"Webshare config failed, falling back: {e}", file=sys.stderr)
+            
+            if not api:
+                proxy_config = GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
+                api = YouTubeTranscriptApi(proxy_config=proxy_config)
+        else:
+            api = YouTubeTranscriptApi()
+
         transcript_list = api.list(video_id)
 
         for transcript in transcript_list:
@@ -116,9 +140,7 @@ def list_transcripts_json(video_id: str, include_transcript: bool = False):
             }
             
             if include_transcript:
-                full_text = get_transcript_text(transcript)
-                if full_text:
-                    t_info["transcript"] = full_text
+                t_info["transcript"] = get_transcript_text(transcript)
                 
             result["transcripts"].append(t_info)
 
