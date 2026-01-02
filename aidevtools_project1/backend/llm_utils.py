@@ -1,5 +1,5 @@
 import os
-import google.generativeai as genai
+from google import genai
 from typing import Optional
 
 STUDY_GUIDE_PROMPT = """You are a highly capable research assistant and tutor. Create a detailed study guide designed to review understanding of the transcript. Create a quiz with ten short-answer questions (2-3 sentences each) and include a separate answer key.
@@ -24,16 +24,15 @@ Transcript:
 def get_api_key() -> Optional[str]:
     return os.environ.get("GOOGLE_API_KEY")
 
-def configure_genai():
+def get_client():
     api_key = get_api_key()
     if not api_key:
         raise ValueError("GOOGLE_API_KEY environment variable not set.")
-    genai.configure(api_key=api_key)
+    return genai.Client(api_key=api_key)
 
 def generate_content(prompt_template: str, transcript: str, custom_prompt: Optional[str] = None) -> str:
     try:
-        configure_genai()
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        client = get_client()
         
         # If custom prompt is provided, use it. Otherwise use the template.
         # Note: The template expects {transcript}. A custom prompt might not have it formatted, 
@@ -45,7 +44,9 @@ def generate_content(prompt_template: str, transcript: str, custom_prompt: Optio
         else:
              final_prompt = prompt_template.format(transcript=transcript)
 
-        response = model.generate_content(final_prompt)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash", contents=final_prompt
+        )
         return response.text
     except ValueError as ve:
         return f"Error: {str(ve)}"
@@ -71,8 +72,8 @@ Introduce yourself, describe the material, and ask the user a starter question a
 
 def chat_with_study_guide(study_guide: str, message: str, history: list) -> str:
     try:
-        configure_genai()
-        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        client = get_client()
         
         # Construct the full prompt with history
         full_prompt = CHAT_SYSTEM_PROMPT.format(study_guide=study_guide) + "\n\n"
@@ -87,15 +88,17 @@ def chat_with_study_guide(study_guide: str, message: str, history: list) -> str:
                 
         full_prompt += f"User: {message}\nAssistant:"
         
-        response = model.generate_content(full_prompt)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash", contents=full_prompt
+        )
         return response.text
     except Exception as e:
         return f"Error: {str(e)}"
 
 def chat_with_study_guide_stream(study_guide: str, message: str, history: list):
     try:
-        configure_genai()
-        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        client = get_client()
         
         # Construct the full prompt with history
         full_prompt = CHAT_SYSTEM_PROMPT.format(study_guide=study_guide) + "\n\n"
@@ -110,7 +113,9 @@ def chat_with_study_guide_stream(study_guide: str, message: str, history: list):
                 
         full_prompt += f"User: {message}\nAssistant:"
         
-        response = model.generate_content(full_prompt, stream=True)
+        response = client.models.generate_content_stream(
+            model="gemini-2.0-flash", contents=full_prompt
+        )
         for chunk in response:
             if chunk.text:
                 yield chunk.text

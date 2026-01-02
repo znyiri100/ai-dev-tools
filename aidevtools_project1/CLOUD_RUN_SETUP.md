@@ -29,41 +29,31 @@ You can configure your services using either **Plain Environment Variables** (ea
 
 Using Secret Manager ensures your credentials (API keys, DB passwords) are encrypted and not visible in the Cloud Run console.
 
-#### 1. Create Secrets
-Run the following commands to create secrets in your project. Replace `[VALUE]` with your actual secrets.
+#### 1. Setup Script
+
+First, export your secrets as environment variables in your current shell (e.g. `export POSTGRES_PASSWORD=...`).
+
+Then run the following commands to create the secrets, grant access to the Cloud Run service account, and update the backend service:
 
 ```bash
-# Database Credentials (Supabase)
-printf "[VALUE]" | gcloud secrets create postgres-host --data-file=-
-printf "[VALUE]" | gcloud secrets create postgres-user --data-file=-
-printf "[VALUE]" | gcloud secrets create postgres-password --data-file=-
-printf "[VALUE]" | gcloud secrets create postgres-db --data-file=-
+printf "$POSTGRES_HOST" | gcloud secrets create postgres-host --data-file=-
+printf "$POSTGRES_USER" | gcloud secrets create postgres-user --data-file=-
+printf "$POSTGRES_PASSWORD" | gcloud secrets create postgres-password --data-file=-
+printf "$POSTGRES_DATABASE" | gcloud secrets create postgres-db --data-file=-
+printf "$YOUTUBE_API_KEY" | gcloud secrets create youtube-api-key --data-file=-
+printf "$GOOGLE_API_KEY" | gcloud secrets create google-api-key --data-file=-
 
-# API Keys
-printf "[VALUE]" | gcloud secrets create youtube-api-key --data-file=-
-printf "[VALUE]" | gcloud secrets create google-api-key --data-file=-
-```
-
-#### 2. Grant Access
-Give your Cloud Run service account permission to access these secrets.
-(The default compute service account is usually `[PROJECT_NUMBER]-compute@developer.gserviceaccount.com`)
-
-```bash
 PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
 SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-
 gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
     --member="serviceAccount:${SERVICE_ACCOUNT}" \
     --role="roles/secretmanager.secretAccessor"
-```
 
-#### 3. Update Backend Service
-Map the secrets to environment variables in your Backend service.
-
-```bash
 gcloud run services update aidevtools-backend \
     --region us-central1 \
-    --update-secrets POSTGRES_HOST=postgres-host:latest,POSTGRES_USER=postgres-user:latest,POSTGRES_PASSWORD=postgres-password:latest,POSTGRES_DATABASE=postgres-db:latest,YOUTUBE_API_KEY=youtube-api-key:latest
+    --update-secrets POSTGRES_HOST=postgres-host:latest,POSTGRES_USER=postgres-user:latest,POSTGRES_PASSWORD=postgres-password:latest,POSTGRES_DATABASE=postgres-db:latest
+gcloud run services update aidevtools-backend --region us-central1 --update-secrets YOUTUBE_API_KEY=youtube-api-key:latest
+gcloud run services update aidevtools-backend --region us-central1 --update-secrets GOOGLE_API_KEY=google-api-key:latest
 ```
 
 ### Option B: Plain Environment Variables (Quick)
