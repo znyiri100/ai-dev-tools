@@ -42,48 +42,59 @@ def extract_video_id(input_string: str) -> str:
     return input_string
 
 def get_video_metadata(video_id: str) -> dict:
-    """Fetch basic video metadata using requests and regex (no API key needed)."""
-    url = f"https://www.youtube.com/watch?v={video_id}"
+    """Fetch basic video metadata using yt-dlp for reliable extraction."""
     try:
-        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
-        response.raise_for_status()
-        html = response.text
+        import yt_dlp
         
-        metadata = {
-            "title": None,
-            "description": None,
-            "author": None,
-            "view_count": None,
-            "duration": None
+        ydl_opts = {
+            'quiet': True,
+            'skip_download': True,
+            'force_generic_extractor': False,
         }
         
-        # Extract Og tags
-        title_match = re.search(r'<meta property="og:title" content="(.*?)">', html)
-        if title_match:
-            metadata["title"] = title_match.group(1)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            info = ydl.extract_info(url, download=False)
             
-        desc_match = re.search(r'<meta property="og:description" content="(.*?)">', html)
-        if desc_match:
-            metadata["description"] = desc_match.group(1)
-            
-        # Try to find author
-        author_match = re.search(r'<link itemprop="name" content="(.*?)">', html)
-        if author_match:
-            metadata["author"] = author_match.group(1)
-            
-        # Try to find view count (approximate)
-        views_match = re.search(r'<meta itemprop="interactionCount" content="(.*?)">', html)
-        if views_match:
-            metadata["view_count"] = views_match.group(1)
-
-        # Try to find duration
-        duration_match = re.search(r'<meta itemprop="duration" content="(.*?)">', html)
-        if duration_match:
-            metadata["duration"] = duration_match.group(1)
-            
-        return metadata
+            return {
+                "title": info.get("title"),
+                "description": info.get("description", "")[:500] if info.get("description") else None,
+                "author": info.get("uploader") or info.get("channel"),
+                "view_count": str(info.get("view_count")) if info.get("view_count") else None,
+                "duration": f"PT{info.get('duration', 0)}S" if info.get("duration") else None
+            }
     except Exception as e:
-        return {"error": str(e)}
+        # Fallback to basic HTML scraping if yt-dlp fails
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        try:
+            response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            response.raise_for_status()
+            html = response.text
+            
+            metadata = {
+                "title": None,
+                "description": None,
+                "author": None,
+                "view_count": None,
+                "duration": None
+            }
+            
+            # Extract Og tags
+            title_match = re.search(r'<meta property="og:title" content="(.*?)">', html)
+            if title_match:
+                metadata["title"] = title_match.group(1)
+                
+            desc_match = re.search(r'<meta property="og:description" content="(.*?)">', html)
+            if desc_match:
+                metadata["description"] = desc_match.group(1)
+                
+            author_match = re.search(r'<link itemprop="name" content="(.*?)">', html)
+            if author_match:
+                metadata["author"] = author_match.group(1)
+                
+            return metadata
+        except Exception as e2:
+            return {"error": str(e2)}
 
 def get_transcript_text(transcript_obj):
     """Fetch transcript data and return the full text."""

@@ -1,3 +1,4 @@
+from pathlib import Path
 from nicegui import run, ui, app
 import asyncio
 import json
@@ -8,6 +9,29 @@ from youtube_api import search_videos
 client = ApiClient()
 
 def main():
+    # --- Sound Effects Script ---
+    ui.add_head_html("""
+    <script>
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, type, duration) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    }
+    function playChatSound() { playTone(600, 'sine', 0.1); }
+    function playCorrectSound() { playTone(800, 'sine', 0.1); setTimeout(() => playTone(1200, 'sine', 0.2), 100); }
+    function playIncorrectSound() { playTone(200, 'sawtooth', 0.3); }
+    </script>
+    """)
+
     # --- State Variables ---
     state = {
         "topic_input": "",
@@ -61,6 +85,8 @@ Transcript:
     quiz_output_text = None
     db_sg_output = None
     db_quiz_output = None
+    sg_read_display = None
+    chat_history = []
     
     # Quiz
     quiz_container = None
@@ -175,7 +201,7 @@ Transcript:
                 first_transcript = transcripts[0] if isinstance(transcripts[0], dict) else {}
                 transcript_text = first_transcript.get("transcript", "")
                 if transcript_text:
-                    transcript_output.value = transcript_text[:3000] + ("..." if len(transcript_text) > 3000 else "")
+                    transcript_output.value = transcript_text
                 else:
                     transcript_output.value = "No transcript text available"
             elif transcript_output:
@@ -281,7 +307,7 @@ Transcript:
              ui.notify(f"Error refreshing list: {err}", type="negative")
 
     async def load_db_video_details(e):
-        nonlocal selected_db_video_id
+        nonlocal selected_db_video_id, sg_read_display, chat_history
         if not e.selection: return
         row = e.selection[0]
         selected_db_video_id = row['video_id']
@@ -303,9 +329,67 @@ Transcript:
             
             if db_transcript_output: db_transcript_output.value = txt
             if db_sg_output: db_sg_output.set_content(sg)
-            if chat_sg_display: chat_sg_display.set_content(f"**Context Used:**\n\n{sg[:200]}...") # Show snippet
-            if db_quiz_output: db_quiz_output.set_content(qz)
+            # if chat_sg_display: chat_sg_display.set_content(f"**Context Used:**\n\n{sg[:200]}...") # Removed context display
+            if sg_read_display: sg_read_display.set_content(sg if sg else "_No study guide generated yet. Generate one in the Lessons tab._")
             
+            # Format quiz as JSON code block
+            if db_quiz_output:
+                if qz:
+                    # Try to parse and pretty-print as JSON
+                    try:
+                        quiz_parsed = json.loads(qz)
+                        db_quiz_output.set_content(f"```json\n{json.dumps(quiz_parsed, indent=2)}\n```")
+                    except json.JSONDecodeError:
+                        # If not valid JSON, show as-is
+                        db_quiz_output.set_content(qz)
+                else:
+                    db_quiz_output.set_content("_No quiz generated yet_")
+            
+            # Initialize Chat with Intro
+            if chat_container and sg:
+                chat_container.clear()
+                # Reset history when loading a new video's chat
+                chat_history = []
+                
+                with chat_container:
+                     ui.spinner('dots')
+                
+                # Fetch intro
+                lang = selected.get("language_code", "en") if selected else "en"
+                
+                try:
+                     # Create placeholder for streaming response
+                     with chat_container:
+                          with ui.chat_message(name="Tutor", sent=False):
+                               response_message = ui.markdown("Thinking...").classes('text-lg')
+                     
+                     full_response = ""
+                     first_chunk = True
+                     async for chunk in client.chat_with_guide_stream(selected_db_video_id, lang, "Hello (Introduce yourself and the topic)", []):
+                          if first_chunk:
+                               response_message.content = ""
+                               first_chunk = False
+                               ui.run_javascript("playChatSound()")
+                          full_response += chunk
+                          response_message.content = full_response
+                          ui.run_javascript(f'getElement({chat_container.id}).scrollTop = getElement({chat_container.id}).scrollHeight')
+                     
+                     if not full_response:
+                          response_message.content = "Hello! I'm ready to help you study this video."
+                     
+                     # Add intro to history
+                     chat_history.append({"role": "assistant", "content": full_response})
+                     ui.run_javascript(f'getElement({chat_container.id}).scrollTop = getElement({chat_container.id}).scrollHeight')
+                     
+                except Exception as e:
+                    chat_container.clear()
+                    with chat_container:
+                        ui.chat_message(f"Error starting chat: {str(e)}", name="System", sent=False)
+            elif chat_container:
+                 chat_container.clear()
+                 with chat_container:
+                      ui.chat_message("Please generate a study guide for this video first.", name="System", sent=False)
+
             # Setup Interactive Quiz
             if qz:
                 setup_quiz(qz)
@@ -314,73 +398,85 @@ Transcript:
 
     async def generate_sg_search():
         """Generate study guide for Search & Store tab - only populates UI, doesn't save"""
-        nonlocal sg_output
+        nonlocal sg_output, transcript_output
         vid = state['video_id_input']
         if not vid:
             ui.notify("Please enter a Video ID first", type="warning")
             return
         
-        # Fetch video details to get language code and transcript
-        resp = await client.get_video_details(vid)
-        if not resp or resp.status_code != 200:
-            ui.notify("Video not found in database. Please save it first.", type="warning")
+        # Get transcript from the transcript preview (already fetched from YouTube)
+        transcript_text = transcript_output.value if transcript_output else ""
+        
+        # If no transcript in preview, try to fetch from YouTube API
+        if not transcript_text or transcript_text == "No transcript text available":
+            ui.notify("Fetching transcript...", type="info")
+            yt_resp = await client.get_video(vid, include_transcript=True)
+            if yt_resp and yt_resp.status_code == 200:
+                yt_data = yt_resp.json()
+                transcripts = yt_data.get("transcripts", [])
+                if transcripts:
+                    first_transcript = transcripts[0] if isinstance(transcripts[0], dict) else {}
+                    transcript_text = first_transcript.get("transcript", "")
+                    if transcript_output:
+                        transcript_output.value = transcript_text
+        
+        if not transcript_text or transcript_text == "No transcript text available":
+            ui.notify("No transcript available. Make sure 'Include Transcript' is checked and fetch again.", type="warning")
             return
-            
-        data = resp.json()
-        transcripts = data.get("transcripts", [])
-        if not transcripts:
-            ui.notify("No transcripts available", type="warning")
-            return
-            
-        selected = next((t for t in transcripts if t.get("is_generated") is True), transcripts[0])
-        lang = selected.get("language_code", "en")
         
         prompt = state.get('sg_prompt_input')
         
         ui.notify("Generating Study Guide...", type="info")
-        gen_resp = await client.generate_study_guide(vid, lang, prompt=prompt)
+        gen_resp = await client.generate_study_guide_direct(transcript_text, prompt=prompt)
         if gen_resp and gen_resp.status_code == 200:
             content = gen_resp.json().get("content", "")
             if sg_output: 
-                sg_output.value = content  # Only populate UI, don't save yet
+                sg_output.value = content
             ui.notify("Study Guide Generated! Click 'Save Lesson' to save.", type="positive")
         else:
-            ui.notify("Generation failed", type="negative")
+            err = gen_resp.text if gen_resp else "Connection error"
+            ui.notify(f"Generation failed: {err}", type="negative")
 
     async def generate_qz_search():
         """Generate quiz for Search & Store tab - only populates UI, doesn't save"""
-        nonlocal quiz_output_text
+        nonlocal quiz_output_text, transcript_output
         vid = state['video_id_input']
         if not vid:
             ui.notify("Please enter a Video ID first", type="warning")
             return
-            
-        # Fetch video details to get language code and transcript
-        resp = await client.get_video_details(vid)
-        if not resp or resp.status_code != 200:
-            ui.notify("Video not found in database. Please save it first.", type="warning")
+        
+        # Get transcript from the transcript preview (already fetched from YouTube)
+        transcript_text = transcript_output.value if transcript_output else ""
+        
+        # If no transcript in preview, try to fetch from YouTube API
+        if not transcript_text or transcript_text == "No transcript text available":
+            ui.notify("Fetching transcript...", type="info")
+            yt_resp = await client.get_video(vid, include_transcript=True)
+            if yt_resp and yt_resp.status_code == 200:
+                yt_data = yt_resp.json()
+                transcripts = yt_data.get("transcripts", [])
+                if transcripts:
+                    first_transcript = transcripts[0] if isinstance(transcripts[0], dict) else {}
+                    transcript_text = first_transcript.get("transcript", "")
+                    if transcript_output:
+                        transcript_output.value = transcript_text
+        
+        if not transcript_text or transcript_text == "No transcript text available":
+            ui.notify("No transcript available. Make sure 'Include Transcript' is checked and fetch again.", type="warning")
             return
-            
-        data = resp.json()
-        transcripts = data.get("transcripts", [])
-        if not transcripts:
-            ui.notify("No transcripts available", type="warning")
-            return
-            
-        selected = next((t for t in transcripts if t.get("is_generated") is True), transcripts[0])
-        lang = selected.get("language_code", "en")
         
         prompt = state.get('quiz_prompt_input')
         
         ui.notify("Generating Quiz...", type="info")
-        gen_resp = await client.generate_quiz(vid, lang, prompt=prompt)
+        gen_resp = await client.generate_quiz_direct(transcript_text, prompt=prompt)
         if gen_resp and gen_resp.status_code == 200:
             content = gen_resp.json().get("content", "")
             if quiz_output_text: 
-                quiz_output_text.value = content  # Only populate UI, don't save yet
+                quiz_output_text.value = content
             ui.notify("Quiz Generated! Click 'Save Lesson' to save.", type="positive")
         else:
-            ui.notify("Generation failed", type="negative")
+            err = gen_resp.text if gen_resp else "Connection error"
+            ui.notify(f"Generation failed: {err}", type="negative")
 
     async def generate_sg():
         if not selected_db_video_id:
@@ -506,7 +602,9 @@ Transcript:
         # ... (Improving this part in the layout section below)
 
     # --- Chat Logic ---
+    # --- Chat Logic ---
     async def chat_submit(e):
+        nonlocal chat_history
         msg = e.sender.value
         e.sender.value = "" # clear input
         if not msg: return
@@ -516,7 +614,11 @@ Transcript:
 
         # UI Chat Message (User)
         with chat_container:
-            ui.chat_message(msg, name="You", sent=True)
+            with ui.chat_message(name="You", sent=True):
+                ui.markdown(msg).classes('text-lg')
+            
+        # Add to history
+        chat_history.append({"role": "user", "content": msg})
             
         # Get response
         # Need lang... again assume fetch or robust state
@@ -524,15 +626,25 @@ Transcript:
         selected = next((t for t in resp.json().get("transcripts", []) if t.get("is_generated") is True), {})
         lang = selected.get("language_code", "en")
         
-        # History is not fully implemented in backend call in this snippet, passing empty for now or track it
-        bot_resp = await client.chat_with_guide(selected_db_video_id, lang, msg, [])
-        
-        reply = "Error"
-        if bot_resp and bot_resp.status_code == 200:
-             reply = bot_resp.json().get("content", "")
-        
+        # Pass history to backend (streaming)
         with chat_container:
-            ui.chat_message(reply, name="Tutor", sent=False)
+            with ui.chat_message(name="Tutor", sent=False):
+                 response_message = ui.markdown("...").classes('text-lg')
+        
+        full_reply = ""
+        first = True
+        async for chunk in client.chat_with_guide_stream(selected_db_video_id, lang, msg, chat_history):
+             if first:
+                 response_message.content = ""
+                 first = False
+                 ui.run_javascript("playChatSound()")
+             full_reply += chunk
+             response_message.content = full_reply
+             ui.run_javascript(f'getElement({chat_container.id}).scrollTop = getElement({chat_container.id}).scrollHeight')
+             
+        # Add bot reply to history
+        chat_history.append({"role": "assistant", "content": full_reply})
+        ui.run_javascript(f'getElement({chat_container.id}).scrollTop = getElement({chat_container.id}).scrollHeight')
 
     # --- Layout ---
     ui.colors(primary='#6A1B9A', secondary='#FFD700', accent='#D81B60', positive='#21BA45')
@@ -542,10 +654,12 @@ Transcript:
         ui.label('Learnify').classes('text-h6 text-white')
 
     with ui.tabs().classes('w-full') as tabs:
-        search_tab = ui.tab('Search & Store')
+        search_tab = ui.tab('SEARCH')
         db_tab = ui.tab('Lessons')
-        chat_tab = ui.tab('Study Guide Chat')
-        quiz_tab = ui.tab('Interactive Quiz')
+        sg_tab = ui.tab('Study Guide')
+        chat_tab = ui.tab('Chat')
+        quiz_tab = ui.tab('Quiz')
+        docs_tab = ui.tab('Docs')
 
     with ui.tab_panels(tabs, value=search_tab).classes('w-full p-4'):
         
@@ -605,7 +719,7 @@ Transcript:
                         # Transcript Preview Column (conditionally visible)
                         transcript_column = ui.column().classes('flex-1 min-w-0')
                         with transcript_column:
-                            ui.label("Transcript Preview").classes('text-lg font-bold')
+                            ui.label("Transcript").classes('text-lg font-bold')
                             transcript_output = ui.textarea(label='', placeholder='Transcript will appear here when video is selected...').props('readonly').classes('w-full h-48')
                         transcript_column.bind_visibility_from(state, 'include_transcript')
                         
@@ -639,7 +753,12 @@ Transcript:
             
             db_table = ui.table(columns=[
                     {'name': 'video_id', 'label': 'ID', 'field': 'video_id'},
-                    {'name': 'title', 'label': 'Title', 'field': 'title'},
+                    {'name': 'title', 'label': 'Title', 'field': 'title', 'classes': 'ellipsis', 'style': 'max-width: 250px;'},
+                    {'name': 'author', 'label': 'Author', 'field': 'author'},
+                    {'name': 'duration', 'label': 'Duration', 'field': 'duration'},
+                    {'name': 'view_count', 'label': 'Views', 'field': 'view_count'},
+                    {'name': 'has_study_guide', 'label': 'SG', 'field': 'has_study_guide'},
+                    {'name': 'has_quiz', 'label': 'Quiz', 'field': 'has_quiz'},
                     {'name': 'fetched_at', 'label': 'Fetched At', 'field': 'fetched_at'},
                 ], rows=[], row_key='video_id', selection='single', on_select=load_db_video_details).classes('w-full mt-2')
             
@@ -665,19 +784,25 @@ Transcript:
                           #ui.button('Generate Quiz', on_click=generate_qz).classes('mb-2')
                           db_quiz_output = ui.markdown("").classes('w-full')
 
-        # --- TAB 3: Chat ---
-        with ui.tab_panel(chat_tab):
-             with ui.row().classes('h-full w-full'):
-                  with ui.column().classes('w-1/3 h-full border-r p-2'):
-                       ui.label("Study Guide Context").classes('text-h6')
-                       chat_sg_display = ui.markdown("Select a video in DB tab first...").classes('overflow-auto h-full text-sm')
-                  
-                  with ui.column().classes('w-2/3 h-full p-2'):
-                       chat_container = ui.column().classes('w-full h-full overflow-auto')
-                       with ui.row().classes('w-full mt-auto'):
-                            ui.input(placeholder='Ask a question...').on('keydown.enter', chat_submit).classes('w-full')
+        # --- TAB 3: Study Guide (Read-only) ---
+        with ui.tab_panel(sg_tab):
+            ui.label("Study Guide").classes('text-h5 mb-4')
+            ui.markdown("Select a video from the Lessons tab to view its study guide.").classes('text-gray-500 mb-4')
+            sg_read_display = ui.markdown("").classes('w-full border rounded p-4 bg-gray-50 min-h-96 overflow-auto')
 
-        # --- TAB 4: Interactive Quiz ---
+        # --- TAB 4: Chat ---
+        with ui.tab_panel(chat_tab):
+             with ui.column().classes('h-[65vh] w-full border rounded shadow-sm p-4 items-stretch'):
+                   # Chat history container
+                   chat_container = ui.column().classes('w-full flex-grow overflow-auto space-y-4')
+                   with chat_container:
+                       ui.chat_message("Select a video from the Lessons tab to start chatting.", name="System", sent=False)
+                   
+                   # Input area
+                   with ui.column().classes('w-full mt-auto pt-2 border-t shrink-0'):
+                        ui.input(placeholder='Ask a question...').on('keydown.enter', chat_submit).classes('w-full').props('outlined rounded')
+
+        # --- TAB 5: Quiz ---
         with ui.tab_panel(quiz_tab):
             quiz_progress_label = ui.label("Select a video and generate a quiz first.").classes('text-lg')
             quiz_container = ui.card().classes('w-full max-w-2xl mx-auto mt-4 p-4').props('visible=False')
@@ -756,8 +881,10 @@ Transcript:
                     if is_correct: 
                         user_score += 1
                         msg = f"✅ **Correct!**\n\n{q.get('explanation', '')}"
+                        ui.run_javascript("playCorrectSound()")
                     else:
                         msg = f"❌ **Incorrect.**\n\nCorrect: **{correct}**\n\n{q.get('explanation', '')}"
+                        ui.run_javascript("playIncorrectSound()")
                     
                     quiz_feedback_label.set_content(msg)
                     quiz_feedback_label.visible = True
@@ -784,6 +911,30 @@ Transcript:
                 # HACK: Hook it back to the outer scope function
                 # Hook it back to the outer scope function
                 quiz_handlers['show_question'] = show_question_local
+
+        with ui.tab_panel(docs_tab):
+            ui.label('System Documentation').classes('text-h4 mb-4')
+            try:
+                base_path = Path(__file__).resolve().parent.parent / "docs"
+                erd_path = base_path / "erd.mmd"
+                flow_path = base_path / "flow.mmd"
+                
+                with ui.row().classes('w-full space-x-4 items-start'):
+                    with ui.card().classes('w-1/2 p-4'):
+                        ui.label('Data Model (ERD)').classes('text-h6 font-bold mb-2')
+                        if erd_path.exists():
+                            ui.mermaid(erd_path.read_text()).classes('w-full')
+                        else:
+                            ui.label(f'erd.mmd not found at {erd_path}').classes('text-red')
+                            
+                    with ui.card().classes('w-1/2 p-4'):
+                        ui.label('System Flow').classes('text-h6 font-bold mb-2')
+                        if flow_path.exists():
+                            ui.mermaid(flow_path.read_text()).classes('w-full')
+                        else:
+                            ui.label(f'flow.mmd not found at {flow_path}').classes('text-red')
+            except Exception as e:
+                ui.label(f"Error loading docs: {e}").classes('text-red')
 
     # Initial Load
     ui.timer(0.1, refresh_db_list, once=True)

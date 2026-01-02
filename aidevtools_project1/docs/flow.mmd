@@ -1,0 +1,13 @@
+graph TD
+    User[User] -->|Interacts| Frontend["NiceGUI Frontend"]
+    Frontend -->|HTTP Requests| API["FastAPI Backend"]
+    
+    subgraph Backend
+        API -->|Fetch/Search| YT["YouTube API (Internal/External)"]
+        API -->|Read/Write| DB[("Database DuckDB/Postgres")]
+        API -->|Generate/Chat| LLM["Gemini LLM"]
+    end
+    
+    YT -->|Video Data| API
+    DB -->|Stored Data| API
+    LLM -->|Study Guide/Quiz/Chat| API

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import youtube_api
@@ -84,6 +85,25 @@ def chat_with_study_guide_endpoint(video_id: str, language_code: str, request: C
     
     return {"message": "Chat response generated", "content": content}
 
+@app.post("/api/v1/transcript/{video_id}/{language_code}/chat/stream")
+def chat_with_study_guide_stream_endpoint(video_id: str, language_code: str, request: ChatRequest, db: Session = Depends(get_db)):
+    # Order by is_generated descending to match generation priority
+    transcript = db.query(DbTranscript).filter(
+        DbTranscript.video_id == video_id,
+        DbTranscript.language_code == language_code
+    ).order_by(DbTranscript.is_generated.desc()).first()
+    
+    if not transcript:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+    
+    if not transcript.study_guide:
+        raise HTTPException(status_code=400, detail="Study guide not generated yet. Please generate it first.")
+
+    return StreamingResponse(
+        llm_utils.chat_with_study_guide_stream(transcript.study_guide, request.message, request.history),
+        media_type="text/plain"
+    )
+
 class GenerateRequest(BaseModel):
     prompt: Optional[str] = None
 
@@ -118,6 +138,42 @@ def update_transcript_content(
     db.commit()
     
     return {"message": "Content updated successfully"}
+
+
+class DirectGenerateRequest(BaseModel):
+    transcript: str
+    prompt: Optional[str] = None
+
+@app.post("/api/v1/generate/study_guide", response_model=GenerateResponse)
+def generate_study_guide_direct(request: DirectGenerateRequest):
+    """
+    Generate study guide directly from transcript text (no database required).
+    """
+    if not request.transcript or not request.transcript.strip():
+        raise HTTPException(status_code=400, detail="Transcript text is required")
+    
+    content = llm_utils.generate_study_guide(request.transcript, prompt=request.prompt)
+    
+    if content.startswith("Error"):
+        raise HTTPException(status_code=500, detail=content)
+    
+    return {"message": "Study Guide generated successfully", "content": content}
+
+@app.post("/api/v1/generate/quiz", response_model=GenerateResponse)
+def generate_quiz_direct(request: DirectGenerateRequest):
+    """
+    Generate quiz directly from transcript text (no database required).
+    """
+    if not request.transcript or not request.transcript.strip():
+        raise HTTPException(status_code=400, detail="Transcript text is required")
+    
+    content = llm_utils.generate_quiz(request.transcript, prompt=request.prompt)
+    
+    if content.startswith("Error"):
+        raise HTTPException(status_code=500, detail=content)
+    
+    return {"message": "Quiz generated successfully", "content": content}
+
 
 
 @app.post("/api/v1/transcript/{video_id}/{language_code}/generate_study_guide", response_model=GenerateResponse)
@@ -215,9 +271,18 @@ def list_stored_videos(db: Session = Depends(get_db)):
     videos = db.query(DbVideo).all()
     results = []
     for v in videos:
+        # Check if study guide or quiz exists in any transcript
+        has_sg = any(t.study_guide for t in v.transcripts) if v.transcripts else False
+        has_quiz = any(t.quiz for t in v.transcripts) if v.transcripts else False
+        
         results.append({
             "video_id": v.video_id,
             "title": v.title,
+            "author": v.author,
+            "duration": v.duration,
+            "view_count": v.view_count,
+            "has_study_guide": "✓" if has_sg else "",
+            "has_quiz": "✓" if has_quiz else "",
             "fetched_at": v.fetched_at
         })
     return results

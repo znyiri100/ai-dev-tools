@@ -61,6 +61,20 @@ class ApiClient:
     async def chat_with_guide(self, video_id, lang_code, message, history):
         payload = {"message": message, "history": history}
         return await self._post(f"/api/v1/transcript/{video_id}/{lang_code}/chat", json_data=payload)
+
+    async def chat_with_guide_stream(self, video_id, lang_code, message, history):
+        payload = {"message": message, "history": history}
+        endpoint = f"/api/v1/transcript/{video_id}/{lang_code}/chat/stream"
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                # Use stream method
+                async with client.stream("POST", f"{self.base_url}{endpoint}", json=payload) as response:
+                    async for chunk in response.aiter_text():
+                        yield chunk
+            except Exception as e:
+                print(f"Error STREAM POST {endpoint}: {e}")
+                yield f"Error: {str(e)}"
     
     async def update_transcript_content(self, video_id, lang_code, study_guide=None, quiz=None):
         payload = {}
@@ -69,6 +83,20 @@ class ApiClient:
         if quiz is not None:
             payload["quiz"] = quiz
         return await self._put(f"/api/v1/transcript/{video_id}/{lang_code}/update", json_data=payload)
+    
+    async def generate_study_guide_direct(self, transcript, prompt=None):
+        """Generate study guide directly from transcript text (no DB required)"""
+        payload = {"transcript": transcript}
+        if prompt:
+            payload["prompt"] = prompt
+        return await self._post("/api/v1/generate/study_guide", json_data=payload)
+    
+    async def generate_quiz_direct(self, transcript, prompt=None):
+        """Generate quiz directly from transcript text (no DB required)"""
+        payload = {"transcript": transcript}
+        if prompt:
+            payload["prompt"] = prompt
+        return await self._post("/api/v1/generate/quiz", json_data=payload)
     
     # Reusing yt-dlp logic would be ideal if we can share code, 
     # but for now we'll keep the client focused on the API server.

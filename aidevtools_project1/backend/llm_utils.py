@@ -91,3 +91,28 @@ def chat_with_study_guide(study_guide: str, message: str, history: list) -> str:
         return response.text
     except Exception as e:
         return f"Error: {str(e)}"
+
+def chat_with_study_guide_stream(study_guide: str, message: str, history: list):
+    try:
+        configure_genai()
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        
+        # Construct the full prompt with history
+        full_prompt = CHAT_SYSTEM_PROMPT.format(study_guide=study_guide) + "\n\n"
+        
+        for msg in history:
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            if role == "user":
+                full_prompt += f"User: {content}\n"
+            elif role == "assistant":
+                full_prompt += f"Assistant: {content}\n"
+                
+        full_prompt += f"User: {message}\nAssistant:"
+        
+        response = model.generate_content(full_prompt, stream=True)
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+    except Exception as e:
+        yield f"Error: {str(e)}"

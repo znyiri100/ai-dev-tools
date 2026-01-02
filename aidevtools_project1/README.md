@@ -2,11 +2,20 @@
 
 This project consists of a FastAPI backend for processing YouTube transcripts and multiple frontend GUI options.
 
+## Documentation
+
+- **[Program Flow & Architecture](docs/program_flow.md)**: Detailed explanation of the system components and data flow.
+- **[Project Vision](docs/project_vision.md)**: Roadmap and future goals.
+- **[Database Schema](docs/erd.svg)**: Entity Relationship Diagram.
+- **[System Flow](docs/flow.svg)**: High-level system interaction diagram.
+
 ## Project Structure
 
 - **`backend/`**: FastAPI server, database logic, and CLI tools.
+- **`frontend_nicegui/`**: **(Recommended)** Main NiceGUI web application.
 - **`frontend_flet/`**: Flet-based desktop/web application.
 - **`frontend_gradio/`**: Gradio-based web application.
+- **`docs/`**: Documentation and diagrams.
 
 ## How to Run
 
@@ -18,7 +27,13 @@ uv run api.py
 - API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### 2. Start the Frontend
-**Option A: Flet GUI (Desktop/Web)**
+**Option A: NiceGUI (Recommended)**
+```bash
+cd frontend_nicegui
+uv run main.py
+```
+
+**Option B: Flet GUI (Desktop/Web)**
 ```bash
 cd frontend_flet
 uv run flet run --web main.py

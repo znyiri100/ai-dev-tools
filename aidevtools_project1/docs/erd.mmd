@@ -1,0 +1,22 @@
+erDiagram
+    Video ||--|{ Transcript : has
+    Video {
+        string video_id PK
+        string title
+        string url
+        string author
+        string description
+        string view_count
+        string duration
+        datetime fetched_at
+    }
+    Transcript {
+        string video_id PK, FK
+        string language_code PK
+        boolean is_generated PK
+        string language
+        boolean is_translatable
+        text transcript
+        text study_guide
+        text quiz
+    }
