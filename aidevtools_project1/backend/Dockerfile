@@ -30,8 +30,6 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Command to run the application
-CMD ["uv", "run", "api.py"]
-# Note: api.py uses uvicorn.run(..., port=8000). 
-# We need api.py to respect the PORT env var or we change the CMD to run uvicorn directly.
-# Better to run uvicorn directly to handle signals and ports properly.
-CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8080"]
+# Command to run the application
+# Cloud Run expects the app to listen on the port defined by the PORT environment variable (default 8080)
+CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8080}"]

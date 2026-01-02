@@ -941,4 +941,8 @@ Transcript:
 
 if __name__ in {"__main__", "__mp_main__"}:
     main()
-    ui.run(title="Learnify")
+    import os
+    port = int(os.environ.get("PORT", 8080))
+    # In production (Docker/Cloud Run), we must listen on 0.0.0.0
+    # Reload=False is better for production
+    ui.run(title="Learnify", host="0.0.0.0", port=port, reload=False)

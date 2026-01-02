@@ -14,6 +14,7 @@ This project provides tools to discover, fetch, and store YouTube video transcri
 - [Docker](https://www.docker.com/) installed and running.
 - [uv](https://github.com/astral-sh/uv) installed for Python dependency management.
 - **YouTube Data API Key**: Required for topic search. Set the environment variable `YOUTUBE_API_KEY`.
+- **Google API Key**: Required for Generative AI features (Gemini). Set `GOOGLE_API_KEY`.
 - **(Optional) Postgres Credentials**: Required for remote storage.
 
 ## Setup
@@ -117,6 +118,7 @@ The pipeline manages two primary tables:
 1.  **Configure Environment:**
     ```bash
     export YOUTUBE_API_KEY="AIza..."
+    export GOOGLE_API_KEY="AIza..."
     # (Optional) Export POSTGRES_HOST... for Supabase
     ```
 
