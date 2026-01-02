@@ -27,7 +27,7 @@ def test_generate_study_guide_success():
     mock_transcript.language_code = "en"
     mock_transcript.transcript = "This is a transcript."
     
-    mock_session.query.return_value.filter.return_value.first.return_value = mock_transcript
+    mock_session.query.return_value.filter.return_value.order_by.return_value.first.return_value = mock_transcript
     
     app.dependency_overrides[get_db] = lambda: mock_session
     
@@ -51,7 +51,7 @@ def test_generate_quiz_success():
     mock_transcript.language_code = "en"
     mock_transcript.transcript = "This is a transcript."
     
-    mock_session.query.return_value.filter.return_value.first.return_value = mock_transcript
+    mock_session.query.return_value.filter.return_value.order_by.return_value.first.return_value = mock_transcript
     
     app.dependency_overrides[get_db] = lambda: mock_session
     
@@ -72,7 +72,7 @@ def test_generate_study_guide_no_transcript_text():
     mock_transcript = MagicMock()
     mock_transcript.transcript = None # Empty transcript
     
-    mock_session.query.return_value.filter.return_value.first.return_value = mock_transcript
+    mock_session.query.return_value.filter.return_value.order_by.return_value.first.return_value = mock_transcript
     app.dependency_overrides[get_db] = lambda: mock_session
     
     response = client.post("/api/v1/transcript/VID1/en/generate_study_guide")
@@ -83,7 +83,7 @@ def test_generate_study_guide_no_transcript_text():
 
 def test_generate_study_guide_not_found():
     mock_session = MagicMock()
-    mock_session.query.return_value.filter.return_value.first.return_value = None
+    mock_session.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
     app.dependency_overrides[get_db] = lambda: mock_session
     
     response = client.post("/api/v1/transcript/VID1/en/generate_study_guide")

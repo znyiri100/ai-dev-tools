@@ -46,6 +46,14 @@ cd frontend_gradio && uv run main.py
 cd frontend_gradio && uv run gradio main.py
 ```
 
+## Testing
+
+To run the unit tests for both backend and frontend, use the following command from the project root:
+
+```bash
+uv run pytest
+```
+
 ## Cloud Deployment (Google Cloud Run)
 
 The project includes `Dockerfile`s for both backend and frontend.
