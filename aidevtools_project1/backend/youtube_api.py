@@ -70,6 +70,11 @@ def get_video_metadata(video_id: str) -> dict:
                 'node': {'args': [node_path] if node_path else []},
             },
         }
+
+        # Use cookies if available
+        if os.path.exists("cookies.txt"):
+            ydl_opts['cookiefile'] = "cookies.txt"
+            print("DEBUG: Using cookies.txt for yt-dlp", file=sys.stderr)
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             url = f"https://www.youtube.com/watch?v={video_id}"
@@ -166,7 +171,13 @@ def list_transcripts_json(video_id: str, include_transcript: bool = False):
             api = YouTubeTranscriptApi()
 
         try:
-            transcript_list = api.list(video_id)
+            # Use cookies if available for transcript API
+            cookies_path = "cookies.txt"
+            if os.path.exists(cookies_path):
+                print(f"DEBUG: Using {cookies_path} for YouTubeTranscriptApi", file=sys.stderr)
+                transcript_list = api.list(video_id, cookies=cookies_path)
+            else:
+                transcript_list = api.list(video_id)
 
             for transcript in transcript_list:
                 t_info = {
