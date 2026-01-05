@@ -14,7 +14,9 @@ This project is configured for deployment on **Google Cloud Run**.
 We have provided a helper script to deploy both services:
 
 ```bash
-./deploy_cloud_run.sh [PROJECT_ID] [REGION]
+PROJECT_ID=$(gcloud config get-value project)
+REGION=us-central1
+./deploy_cloud_run.sh $PROJECT_ID $REGION
 ```
 *   `PROJECT_ID`: Your Google Cloud Project ID (defaults to current config).
 *   `REGION`: e.g., `us-central1` (default).

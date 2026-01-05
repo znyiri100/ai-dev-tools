@@ -336,6 +336,17 @@ Transcript:
                 print(f"DEBUG: First video: {videos[0]}")
             
             # videos is list of dicts: video_id, title, fetched_at, etc.
+            # Convert duration to seconds for display
+            for v in videos:
+                d = v.get('duration')
+                if d and isinstance(d, str) and d.startswith('PT'):
+                     # Format is PT<seconds>S
+                     try:
+                         sec = d.replace('PT', '').replace('S', '')
+                         v['duration'] = int(float(sec))
+                     except:
+                         pass
+
             if db_table:
                 db_table.rows = videos
                 db_table.update()
@@ -808,7 +819,7 @@ Transcript:
                     {'name': 'fetched_at', 'label': 'Fetched At', 'field': 'fetched_at'},
                 ], rows=[], row_key='video_id', selection='single', on_select=load_db_video_details).classes('w-full mt-2')
             
-            db_table.add_slot('body-cell-id', '''
+            db_table.add_slot('body-cell-video_id', '''
                 <q-td :props="props">
                     <a :href="'https://www.youtube.com/watch?v=' + props.value" target="_blank" class="text-blue-600 hover:underline">
                         {{ props.value }}
