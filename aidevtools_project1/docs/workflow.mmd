@@ -1,0 +1,43 @@
+graph TD
+    start((Start)) --> search_tab[Find Tab]
+    
+    subgraph "1. Find Content"
+        search_tab -->|Search Topic| search_res[Show YouTube Results]
+        search_tab -->|Enter Video ID| vid_check{Valid ID?}
+        vid_check -->|Yes| vid_info[Show Video Details]
+        vid_check -->|No| error_id[Show Error]
+        search_res -->|Select Video| vid_info
+        
+        vid_info -->|Optional| preview_trans[Preview Transcript]
+        vid_info -->|Optional| gen_preview[Generate Preview Guide/Quiz]
+        vid_info --> save_btn[Save Lesson]
+    end
+
+    save_btn -->|Store in DB| db[(Database)]
+    db --> pick_tab[Pick Tab]
+
+    subgraph "2. Select Lesson"
+        pick_tab -->|Refresh List| list_vids[List Saved Videos]
+        list_vids -->|Select Video| load_details[Load Video Details]
+        load_details -->|Check Status| status_chk{Has Guide/Quiz?}
+        status_chk -->|No| gen_actions[Generate Guide/Quiz]
+        gen_actions -->|Update| db
+        status_chk -->|Yes| ready_state[Ready for Study]
+    end
+
+    ready_state --> study_features
+
+    subgraph "3. Study & Interact"
+        study_features --> study_tab[Study Tab]
+        study_tab -->|Read| view_sg[View Study Guide]
+        
+        study_features --> chat_tab[Chat Tab]
+        chat_tab -->|Ask Question| ai_tutor[AI Tutor]
+        ai_tutor -->|Context: Study Guide| answer[Get Answer]
+        
+        study_features --> quiz_tab[Quiz Tab]
+        quiz_tab -->|Start| q1[Question 1]
+        q1 -->|Submit Answer| feedback[Instant Feedback]
+        feedback -->|Next| q2[Question 2...]
+        q2 -->|Finish| score[Final Score]
+    end

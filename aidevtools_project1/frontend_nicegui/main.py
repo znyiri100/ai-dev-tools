@@ -802,7 +802,7 @@ Transcript:
                              quiz_output_text = ui.textarea(label='Content', placeholder='Generated quiz JSON...').classes('w-full flex-grow')
                     
                     # Save button at the bottom
-                    ui.button('Save Lesson', color='secondary', icon='save', on_click=store_video_db).classes('mt-4 w-full')
+                    ui.button('Save Lesson', color='primary', icon='save', on_click=store_video_db).classes('mt-4 w-full')
 
         # --- TAB 2: Lessons ---
         with ui.tab_panel(db_tab):
@@ -990,17 +990,30 @@ Transcript:
         with ui.tab_panel(docs_tab):
             ui.label('System Documentation').classes('text-h4 mb-4')
             try:
-                base_path = Path(__file__).resolve().parent.parent / "docs"
+                # Check for local docs (container) first, then parent (local dev)
+                current_dir = Path(__file__).resolve().parent
+                if (current_dir / "docs").exists():
+                    base_path = current_dir / "docs"
+                else:
+                    base_path = current_dir.parent / "docs"
                 erd_path = base_path / "erd.mmd"
                 flow_path = base_path / "flow.mmd"
+                workflow_path = base_path / "workflow.mmd"
                 prog_path = base_path / "program_flow.md"
                 vis_path = base_path / "project_vision.md"
                 
                 # App Explanation
                 ui.markdown(ABOUT_TEXT).classes('text-lg')
 
+                # 1. User Workflow Diagram (Top)
+                ui.label('User Workflow').classes('text-h6 font-bold mt-4 mb-2')
+                if workflow_path.exists():
+                    ui.mermaid(workflow_path.read_text()).classes('w-full border p-4 bg-gray-50')
+                else:
+                    ui.label(f'workflow.mmd not found').classes('text-red')
+
                 # 3. System Flow Diagram
-                ui.label('System Flow').classes('text-h6 font-bold mt-4 mb-2')
+                ui.label('System Architecture').classes('text-h6 font-bold mt-6 mb-2')
                 if flow_path.exists():
                     ui.mermaid(flow_path.read_text()).classes('w-full border p-4 bg-gray-50')
                 else:

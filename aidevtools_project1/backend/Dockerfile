@@ -40,7 +40,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 COPY . .
 
 # Ensure cookies.txt is handled if it exists (using a wildcard trick to avoid error if missing)
-# COPY cookies.txt* ./
+COPY cookies.txt* ./
 
 ENV PORT=8080
 EXPOSE 8080

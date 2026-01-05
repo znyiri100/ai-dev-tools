@@ -56,6 +56,10 @@ if [[ "$deploy_frontend" =~ ^[Yy]$ ]]; then
 
     echo ">>> Deploying Frontend ($FRONTEND_SERVICE) from ./frontend_nicegui ..."
     
+    # Copy docs folder to frontend directory for build context
+    echo ">>> Copying ./docs to ./frontend_nicegui/docs for deployment..."
+    cp -r ./docs ./frontend_nicegui/docs
+
     deploy_cmd="gcloud run deploy $FRONTEND_SERVICE \
         --project $PROJECT_ID \
         --region $REGION \
@@ -70,6 +74,10 @@ if [[ "$deploy_frontend" =~ ^[Yy]$ ]]; then
 
     echo "Running: $deploy_cmd"
     eval $deploy_cmd
+
+    # Clean up copied docs
+    echo ">>> Removing ./frontend_nicegui/docs..."
+    rm -rf ./frontend_nicegui/docs
     
     FRONTEND_URL=$(gcloud run services describe $FRONTEND_SERVICE --project $PROJECT_ID --region $REGION --format 'value(status.url)')
     echo ">>> Frontend deployed at: $FRONTEND_URL"
