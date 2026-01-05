@@ -9,7 +9,7 @@ The application is designed as a decoupled system with a **FastAPI backend** han
 ### 1. Frontend (NiceGUI)
 - **Tech Stack**: Python (NiceGUI), HTML/CSS (Tailwind).
 - **Functionality**:
-  - Provides a tabbed interface for Search, Lessons, Study Guides, Chat, and Quizzes.
+  - Provides a tabbed interface for **Find**, **Pick**, **Study**, Chat, and Quizzes.
   - Communicates with the backend via REST API calls.
   - Manages local UI state (selected video, chat history, quiz progress).
   - Handles real-time updates (streaming chat).
@@ -32,15 +32,15 @@ The application is designed as a decoupled system with a **FastAPI backend** han
 
 ## Key Workflows
 
-### A. Search & Store
-1. User enters a topic or Video ID in the **SEARCH** tab.
+### A. Find & Store
+1. User enters a topic or Video ID in the **Find** tab.
 2. Frontend requests `/api/v1/search` or `/api/v1/video/{id}`.
 3. Backend performs the search (YouTube) and returns results.
 4. User selects a video to "Store".
 5. Backend fetches the full transcript and metadata, saving it to the database (`videos` and `transcripts` tables).
 
-### B. Lesson & Content Generation
-1. User goes to **Lessons** tab to view stored videos.
+### B. Pick & Content Generation
+1. User goes to **Pick** tab to view stored videos.
 2. User selects a video.
 3. If no Study Guide exists, User clicks "Generate Study Guide".
 4. Backend sends the transcript to the LLM with a specific prompt.
@@ -49,7 +49,7 @@ The application is designed as a decoupled system with a **FastAPI backend** han
 
 ### C. Interactive Chat
 1. User goes to **Chat** tab.
-2. The Chat is context-aware, loaded with the specific study guide of the selected video.
+2. The Chat is context-aware, loaded with the study guide of the selected video (from the **Study** tab).
 3. User sends a message.
 4. Backend constructs a prompt including the Study Guide + Chat History + User Message.
 5. Backend streams the LLM response back to the Frontend.

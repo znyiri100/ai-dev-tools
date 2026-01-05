@@ -42,6 +42,8 @@ printf "$POSTGRES_PASSWORD" | gcloud secrets create postgres-password --data-fil
 printf "$POSTGRES_DATABASE" | gcloud secrets create postgres-db --data-file=-
 printf "$YOUTUBE_API_KEY" | gcloud secrets create youtube-api-key --data-file=-
 printf "$GOOGLE_API_KEY" | gcloud secrets create google-api-key --data-file=-
+printf "$HTTP_PROXY_USER" | gcloud secrets create http-proxy-user --data-file=-
+printf "$HTTP_PROXY_PASS" | gcloud secrets create http-proxy-pass --data-file=-
 
 PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
 SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
@@ -54,6 +56,8 @@ gcloud run services update aidevtools-backend \
     --update-secrets POSTGRES_HOST=postgres-host:latest,POSTGRES_USER=postgres-user:latest,POSTGRES_PASSWORD=postgres-password:latest,POSTGRES_DATABASE=postgres-db:latest
 gcloud run services update aidevtools-backend --region us-central1 --update-secrets YOUTUBE_API_KEY=youtube-api-key:latest
 gcloud run services update aidevtools-backend --region us-central1 --update-secrets GOOGLE_API_KEY=google-api-key:latest
+gcloud run services update aidevtools-backend --region us-central1 --update-secrets HTTP_PROXY_USER=http-proxy-user:latest
+gcloud run services update aidevtools-backend --region us-central1 --update-secrets HTTP_PROXY_PASS=http-proxy-pass:latest
 ```
 
 ### Option B: Plain Environment Variables (Quick)

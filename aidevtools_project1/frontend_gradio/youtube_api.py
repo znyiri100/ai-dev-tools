@@ -1,6 +1,18 @@
 import argparse
 import json
 import yt_dlp
+import shutil
+import sys
+
+class YtDlpLogger:
+    def debug(self, msg):
+        pass
+    def warning(self, msg):
+        if "Remote component" in msg or "n challenge solving failed" in msg or "Ignoring unsupported" in msg:
+            return
+        print(f"WARNING: {msg}")
+    def error(self, msg):
+        print(f"ERROR: {msg}")
 
 def search_videos(topic, limit=5):
     """
@@ -13,12 +25,16 @@ def search_videos(topic, limit=5):
     Returns:
         list: A list of dictionaries containing video info (id, title, link, etc.).
     """
+    node_path = shutil.which('node')
     ydl_opts = {
-        'quiet': True,
+        'quiet': False,
         'extract_flat': True, # Don't download, just extract info
         'skip_download': True,
         'force_generic_extractor': False,
-        'js_runtimes': ['node', 'nodejs'],
+        'logger': YtDlpLogger(),
+        'js_runtimes': {
+            'node': {'args': [node_path] if node_path else []},
+        },
     }
 
     try:

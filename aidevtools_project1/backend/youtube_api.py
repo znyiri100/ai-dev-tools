@@ -13,6 +13,18 @@ import json
 import argparse
 import warnings
 import requests
+import shutil
+
+class YtDlpLogger:
+    def debug(self, msg):
+        pass
+    def warning(self, msg):
+        # Suppress known harmless warnings
+        if "Remote component" in msg or "n challenge solving failed" in msg or "Ignoring unsupported" in msg:
+            return
+        print(f"WARNING: {msg}", file=sys.stderr)
+    def error(self, msg):
+        print(f"ERROR: {msg}", file=sys.stderr)
 
 # Suppress Python version warnings from google.api_core
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.api_core._python_version_support")
@@ -46,11 +58,17 @@ def get_video_metadata(video_id: str) -> dict:
     try:
         import yt_dlp
         
+        # Get absolute path to node to assume compatibility
+        node_path = shutil.which('node')
+
         ydl_opts = {
-            'quiet': True,
+            'quiet': False, # Allow logger to handle output
             'skip_download': True,
             'force_generic_extractor': False,
-            'js_runtimes': ['node', 'nodejs'],
+            'logger': YtDlpLogger(),
+            'js_runtimes': {
+                'node': {'args': [node_path] if node_path else []},
+            },
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

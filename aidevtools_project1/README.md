@@ -6,8 +6,8 @@ This project consists of a FastAPI backend for processing YouTube transcripts an
 
 - **[Program Flow & Architecture](docs/program_flow.md)**: Detailed explanation of the system components and data flow.
 - **[Project Vision](docs/project_vision.md)**: Roadmap and future goals.
+- **[System Flow](docs/flow.mmd)**: High-level system interaction diagram.
 - **[Database Schema](docs/erd.svg)**: Entity Relationship Diagram.
-- **[System Flow](docs/flow.svg)**: High-level system interaction diagram.
 
 ## Project Structure
 
@@ -23,6 +23,8 @@ This project consists of a FastAPI backend for processing YouTube transcripts an
 ```bash
 cd backend
 uv run api.py
+# or with hot reload
+uv run uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 ```
 - API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
@@ -32,6 +34,7 @@ uv run api.py
 cd frontend_nicegui
 uv run main.py
 ```
+*Note: Hot reload is enabled by default. To disable it (e.g., for production), set `PROD=true`.*
 
 **Option B: Flet GUI (Desktop/Web)**
 ```bash

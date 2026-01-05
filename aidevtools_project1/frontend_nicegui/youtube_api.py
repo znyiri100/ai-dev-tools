@@ -1,6 +1,18 @@
 import argparse
 import json
 import yt_dlp
+import shutil
+import sys
+
+class YtDlpLogger:
+    def debug(self, msg):
+        pass
+    def warning(self, msg):
+        if "Remote component" in msg or "n challenge solving failed" in msg or "Ignoring unsupported" in msg:
+            return
+        print(f"WARNING: {msg}")
+    def error(self, msg):
+        print(f"ERROR: {msg}")
 
 def search_videos(topic, limit=5):
     """
@@ -13,12 +25,20 @@ def search_videos(topic, limit=5):
     Returns:
         list: A list of dictionaries containing video info (id, title, link, etc.).
     """
+    node_path = shutil.which('node')
+    print(f"DEBUG: node_path found: {node_path}")
     ydl_opts = {
-        'quiet': True,
+        'quiet': False,
         'skip_download': True,
         'force_generic_extractor': False,
-        'js_runtimes': ['node', 'nodejs'],
+        'logger': YtDlpLogger(),
     }
+    
+    if node_path:
+        ydl_opts['js_runtimes'] = {'node': {'args': [node_path]}}
+        print(f"DEBUG: Configured js_runtimes with node: {node_path}")
+    else:
+        print("DEBUG: Node not found, skipping js_runtimes configuration")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -34,7 +54,7 @@ def search_videos(topic, limit=5):
                         'title': entry.get('title'),
                         'uploader': entry.get('uploader') or entry.get('channel') or 'Unknown',
                         'description': entry.get('description') or '',
-                        'link': entry.get('url') or f"https://www.youtube.com/watch?v={entry.get('id')}",
+                        'link': entry.get('webpage_url') or f"https://www.youtube.com/watch?v={entry.get('id')}",
                         'duration': entry.get('duration'),
                         'viewCount': entry.get('view_count'),
                         'publishedTime': entry.get('upload_date') # yt-dlp gives upload_date usually

@@ -4,6 +4,33 @@ import asyncio
 import json
 from api_client import ApiClient
 from youtube_api import search_videos
+import shutil
+import sys
+import re
+
+ABOUT_TEXT = """
+### Welcome to Learnify!
+
+This application helps you master any topic using YouTube videos as source material.
+
+**Workflow:**
+
+1. **Find Source / Generate Lesson**: Search for a topic or paste a video ID to find content.
+
+2. **Pick Lesson**: Select a processed video from your library.
+
+3. **Study / Chat / Quiz**: Use AI-generated study guides, an interactive tutor, and quizzes to deep dive into the material.
+"""
+
+class YtDlpLogger:
+    def debug(self, msg):
+        pass
+    def warning(self, msg):
+        if "Remote component" in msg or "n challenge solving failed" in msg or "Ignoring unsupported" in msg:
+            return
+        print(f"WARNING: {msg}")
+    def error(self, msg):
+        print(f"ERROR: {msg}")
 
 # Initialize Client
 client = ApiClient()
@@ -34,9 +61,7 @@ def main():
 
     # --- State Variables ---
     state = {
-        "topic_input": "",
-        "limit_input": 5,
-        "video_id_input": "EMd3H0pNvSE",
+        "search_input": "EMd3H0pNvSE",
         "include_transcript": False,
         "sg_prompt_input": """You are a highly capable research assistant and tutor. Create a detailed study guide designed to review understanding of the transcript. Create a quiz with ten short-answer questions (2-3 sentences each) and include a separate answer key.
 
@@ -102,15 +127,15 @@ Transcript:
 
     async def search_by_topic():
         nonlocal results_table
-        if not state['topic_input']:
+        if not state['search_input']:
             ui.notify("Please enter a topic", type="warning")
             return
             
         ui.notify("Searching YouTube...", type="info")
-        print(f"DEBUG: Starting search for topic: {state['topic_input']}")
+        print(f"DEBUG: Starting search for topic: {state['search_input']}")
         
         # Run synchronous yt-dlp search in a separate thread to avoid blocking UI
-        results = await run.io_bound(search_videos, state['topic_input'], limit=int(state['limit_input']))
+        results = await run.io_bound(search_videos, state['search_input'], limit=int(state['limit_input']))
         
         print(f"DEBUG: Search results received: {len(results) if results else 0} items")
         
@@ -135,7 +160,7 @@ Transcript:
             
     async def search_by_id():
         nonlocal results_table
-        vid = state['video_id_input']
+        vid = state['search_input']
         if not vid:
             ui.notify("Please enter a Video ID", type="warning")
             return
@@ -145,11 +170,18 @@ Transcript:
         # Use yt-dlp to extract video info (same approach as topic search for reliable view count)
         def extract_video_info(video_id):
             import yt_dlp
+            
+            # Explicitly get node path to avoid inline evaluation issues
+            node_path = shutil.which('node')
+            
             ydl_opts = {
-                'quiet': True,
+                'quiet': False,
                 'skip_download': True,
                 'force_generic_extractor': False,
-                'js_runtimes': ['node', 'nodejs'],
+                'logger': YtDlpLogger(),
+                'js_runtimes': {
+                    'node': {'args': [node_path] if node_path else []},
+                },
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 video_url = f"https://www.youtube.com/watch?v={video_id}"
@@ -166,7 +198,7 @@ Transcript:
                 'description': info.get('description', ''),
                 'duration': info.get('duration'),
                 'viewCount': info.get('view_count'),  # yt-dlp reliably extracts view count
-                'link': info.get('url') or f"https://www.youtube.com/watch?v={vid}",
+                'link': info.get('webpage_url') or f"https://www.youtube.com/watch?v={vid}",
             }
             results_table.rows = [row]
             results_table.update()
@@ -175,16 +207,23 @@ Transcript:
 
 
     async def fetch_from_youtube():
-        if state['video_id_input']:
-            await search_by_id()
-        elif state['topic_input']:
-            await search_by_topic()
+        query = state['search_input'].strip()
+        if not query:
+             ui.notify("Please enter a Video ID or Topic", type="warning")
+             return
+
+        # Simple ID detection: 11 chars, alphanumeric/underscore/dash
+        # This covers standard YouTube video IDs
+        if re.match(r'^[a-zA-Z0-9_-]{11}$', query):
+             ui.notify("Detected Video ID", type="info")
+             await search_by_id()
         else:
-            ui.notify("Please enter a Video ID or Topic", type="warning")
+             ui.notify("Detected Topic Search", type="info")
+             await search_by_topic()
 
     async def get_video_info():
         nonlocal json_output, sg_output, quiz_output_text, transcript_output
-        vid = state['video_id_input']
+        vid = state['search_input']
         if not vid:
              return
         
@@ -236,7 +275,7 @@ Transcript:
 
     async def store_video_db():
         nonlocal sg_output, quiz_output_text
-        vid = state['video_id_input']
+        vid = state['search_input']
         if not vid:
             ui.notify("Please enter a Video ID first", type="warning")
             return
@@ -400,7 +439,7 @@ Transcript:
     async def generate_sg_search():
         """Generate study guide for Search & Store tab - only populates UI, doesn't save"""
         nonlocal sg_output, transcript_output
-        vid = state['video_id_input']
+        vid = state['search_input']
         if not vid:
             ui.notify("Please enter a Video ID first", type="warning")
             return
@@ -441,7 +480,7 @@ Transcript:
     async def generate_qz_search():
         """Generate quiz for Search & Store tab - only populates UI, doesn't save"""
         nonlocal quiz_output_text, transcript_output
-        vid = state['video_id_input']
+        vid = state['search_input']
         if not vid:
             ui.notify("Please enter a Video ID first", type="warning")
             return
@@ -652,15 +691,16 @@ Transcript:
     
     with ui.header().classes(replace='row items-center') as header:
         ui.icon('smart_display', color='white', size='md')
-        ui.label('Learnify').classes('text-h6 text-white')
-
+        ui.label('Learnify:').classes('text-h6 text-white')
+        ui.label('Find source/Generate lesson -> Pick lesson -> Study/Chat/Quiz').classes('text-h6 text-white')
+    
     with ui.tabs().classes('w-full') as tabs:
-        search_tab = ui.tab('SEARCH')
-        db_tab = ui.tab('Lessons')
-        sg_tab = ui.tab('Study Guide')
+        search_tab = ui.tab('Find')
+        db_tab = ui.tab('Pick')
+        sg_tab = ui.tab('Study')
         chat_tab = ui.tab('Chat')
         quiz_tab = ui.tab('Quiz')
-        docs_tab = ui.tab('Docs')
+        docs_tab = ui.tab('About')
 
     with ui.tab_panels(tabs, value=search_tab).classes('w-full p-4'):
         
@@ -671,17 +711,13 @@ Transcript:
                 with ui.column().classes('w-full'):
                     # Unify Search inputs visibly
                     with ui.row().classes('w-full items-center gap-4'):
-                        # ID Input (First now)
-                        vid_input_el = ui.input(label='Video ID').bind_value(state, 'video_id_input').classes('w-48')
+                        # Merged Input
+                        ui.input(label='Find (Topic or Video ID)', placeholder='Enter topic or YouTube ID').bind_value(state, 'search_input').classes('flex-grow')
                         
-                        ui.separator().props('vertical')
-
-                        # Topic Input
-                        ui.input(label='Topic', placeholder='Python programming').bind_value(state, 'topic_input').classes('flex-grow')
-                        ui.number(label='Limit', value=5).bind_value(state, 'limit_input').classes('w-24')
+                        ui.number(label='Limit', value=3).bind_value(state, 'limit_input').classes('w-24')
                         
                         # Fetch Button
-                        ui.button('Fetch from YouTube', icon='cloud_download', on_click=fetch_from_youtube)
+                        ui.button('Find', icon='search', on_click=fetch_from_youtube)
                         
                         # Include Transcript checkbox
                         ui.checkbox('Include Transcript').bind_value(state, 'include_transcript')
@@ -692,24 +728,33 @@ Transcript:
                         {'name': 'title', 'label': 'Title', 'field': 'title', 'classes': 'ellipsis', 'style': 'max-width: 200px;'},
                         {'name': 'uploader', 'label': 'Author', 'field': 'uploader'},
                         {'name': 'description', 'label': 'Description', 'field': 'description', 'classes': 'ellipsis', 'style': 'max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'},
-                        {'name': 'duration', 'label': 'Duration', 'field': 'duration'},
+                         {'name': 'duration', 'label': 'Duration', 'field': 'duration'},
                         {'name': 'viewCount', 'label': 'Views', 'field': 'viewCount'},
-                        {'name': 'link', 'label': 'Link', 'field': 'link'},
                     ]
                     
                     async def on_table_select(e):
                         if e.selection:
                             row = e.selection[0]
-                            state['video_id_input'] = row.get('id')
+                            state['search_input'] = row.get('id')
                             # Auto-fetch full details + DB check
                             await get_video_info()
 
                     results_table = ui.table(columns=columns, rows=[], row_key='id', selection='single', on_select=on_table_select).classes('w-full mt-4')
-                    
-                    # Add slot for clickable link with underline
-                    results_table.add_slot('body-cell-link', '''
+
+                    # Add slot for clickable ID
+                    results_table.add_slot('body-cell-id', '''
                         <q-td :props="props">
-                            <a :href="props.value" target="_blank" style="color: #1976d2; text-decoration: underline;">{{ props.value }}</a>
+                            <a :href="'https://www.youtube.com/watch?v=' + props.value" target="_blank" style="color: #1976d2; text-decoration: underline; cursor: pointer;">{{ props.value }}</a>
+                        </q-td>
+                    ''')
+
+                    results_table.add_slot('body-selection', '''
+                        <q-td auto-width>
+                             <q-icon :name="props.selected ? 'radio_button_checked' : 'radio_button_unchecked'" 
+                                     size="sm" 
+                                     color="primary"
+                                     class="cursor-pointer" 
+                                     @click="props.selected = !props.selected" />
                         </q-td>
                     ''')
                     
@@ -762,6 +807,24 @@ Transcript:
                     {'name': 'has_quiz', 'label': 'Quiz', 'field': 'has_quiz'},
                     {'name': 'fetched_at', 'label': 'Fetched At', 'field': 'fetched_at'},
                 ], rows=[], row_key='video_id', selection='single', on_select=load_db_video_details).classes('w-full mt-2')
+            
+            db_table.add_slot('body-cell-id', '''
+                <q-td :props="props">
+                    <a :href="'https://www.youtube.com/watch?v=' + props.value" target="_blank" class="text-blue-600 hover:underline">
+                        {{ props.value }}
+                    </a>
+                </q-td>
+            ''')
+
+            db_table.add_slot('body-selection', '''
+                <q-td auto-width>
+                        <q-icon :name="props.selected ? 'radio_button_checked' : 'radio_button_unchecked'" 
+                                size="sm" 
+                                color="primary"
+                                class="cursor-pointer" 
+                                @click="props.selected = !props.selected" />
+                </q-td>
+            ''')
             
             ui.label("Selected Video Details").classes('text-h6 mt-4')
             
@@ -919,21 +982,25 @@ Transcript:
                 base_path = Path(__file__).resolve().parent.parent / "docs"
                 erd_path = base_path / "erd.mmd"
                 flow_path = base_path / "flow.mmd"
+                prog_path = base_path / "program_flow.md"
+                vis_path = base_path / "project_vision.md"
                 
-                with ui.row().classes('w-full space-x-4 items-start'):
-                    with ui.card().classes('w-1/2 p-4'):
-                        ui.label('Data Model (ERD)').classes('text-h6 font-bold mb-2')
-                        if erd_path.exists():
-                            ui.mermaid(erd_path.read_text()).classes('w-full')
-                        else:
-                            ui.label(f'erd.mmd not found at {erd_path}').classes('text-red')
-                            
-                    with ui.card().classes('w-1/2 p-4'):
-                        ui.label('System Flow').classes('text-h6 font-bold mb-2')
-                        if flow_path.exists():
-                            ui.mermaid(flow_path.read_text()).classes('w-full')
-                        else:
-                            ui.label(f'flow.mmd not found at {flow_path}').classes('text-red')
+                # App Explanation
+                ui.markdown(ABOUT_TEXT).classes('text-lg')
+
+                # 3. System Flow Diagram
+                ui.label('System Flow').classes('text-h6 font-bold mt-4 mb-2')
+                if flow_path.exists():
+                    ui.mermaid(flow_path.read_text()).classes('w-full border p-4 bg-gray-50')
+                else:
+                    ui.label(f'flow.mmd not found').classes('text-red')
+                
+                # 4. ERD (at bottom)
+                ui.label('Data Model (ERD)').classes('text-h6 font-bold mt-6 mb-2')
+                if erd_path.exists():
+                    ui.mermaid(erd_path.read_text()).classes('w-full border p-4 bg-gray-50')
+                else:
+                    ui.label(f'erd.mmd not found').classes('text-red')
             except Exception as e:
                 ui.label(f"Error loading docs: {e}").classes('text-red')
 
@@ -945,5 +1012,6 @@ if __name__ in {"__main__", "__mp_main__"}:
     import os
     port = int(os.environ.get("PORT", 8080))
     # In production (Docker/Cloud Run), we must listen on 0.0.0.0
-    # Reload=False is better for production
-    ui.run(title="Learnify", host="0.0.0.0", port=port, reload=False)
+    # Reload defaults to True for dev, False if PROD is set
+    is_prod = os.environ.get("PROD", "False").lower() == "true"
+    ui.run(title="Learnify", host="0.0.0.0", port=port, reload=not is_prod)
