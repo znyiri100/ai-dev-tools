@@ -149,6 +149,7 @@ Transcript:
                 'quiet': True,
                 'skip_download': True,
                 'force_generic_extractor': False,
+                'js_runtimes': ['node', 'nodejs'],
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 video_url = f"https://www.youtube.com/watch?v={video_id}"

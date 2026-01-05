@@ -50,6 +50,7 @@ def get_video_metadata(video_id: str) -> dict:
             'quiet': True,
             'skip_download': True,
             'force_generic_extractor': False,
+            'js_runtimes': ['node', 'nodejs'],
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -128,26 +129,22 @@ def list_transcripts_json(video_id: str, include_transcript: bool = False):
     }
 
     try:
-        proxy_url = os.getenv("HTTP_PROXY")
+        HTTP_PROXY_USER = os.getenv("HTTP_PROXY_USER")
+        HTTP_PROXY_PASS = os.getenv("HTTP_PROXY_PASS")
         api = None
         
-        if proxy_url:
-            if "webshare.io" in proxy_url and "@" in proxy_url:
-                try:
-                    parsed = urlparse(proxy_url)
-                    api = YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
-                        proxy_username=parsed.username,
-                        proxy_password=parsed.password,
-                        domain_name=parsed.hostname,
-                        proxy_port=parsed.port or 80
-                    ))
-                except Exception as e:
-                    print(f"Webshare config failed, falling back: {e}", file=sys.stderr)
+        if HTTP_PROXY_USER and HTTP_PROXY_PASS:
+            try:
+                api = YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
+                    proxy_username=HTTP_PROXY_USER,
+                    proxy_password=HTTP_PROXY_PASS,
+                ))
+                print(f"Webshare config success: HTTP_PROXY_USER={HTTP_PROXY_USER}", file=sys.stderr)
+            except Exception as e:
+                print(f"Webshare config failed, falling back: {e}", file=sys.stderr)
             
-            if not api:
-                proxy_config = GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
-                api = YouTubeTranscriptApi(proxy_config=proxy_config)
         else:
+            print(f"Webshare config not set, falling back to no proxy", file=sys.stderr)
             api = YouTubeTranscriptApi()
 
         try:

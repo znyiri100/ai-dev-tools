@@ -18,6 +18,7 @@ def search_videos(topic, limit=5):
         'extract_flat': True, # Don't download, just extract info
         'skip_download': True,
         'force_generic_extractor': False,
+        'js_runtimes': ['node', 'nodejs'],
     }
 
     try:

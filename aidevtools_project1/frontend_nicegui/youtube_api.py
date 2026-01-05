@@ -17,6 +17,7 @@ def search_videos(topic, limit=5):
         'quiet': True,
         'skip_download': True,
         'force_generic_extractor': False,
+        'js_runtimes': ['node', 'nodejs'],
     }
 
     try:
