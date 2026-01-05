@@ -1,13 +1,23 @@
 FROM python:3.11-slim
 
+# Copy uv binary from the official image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 WORKDIR /app
 
-RUN pip install uv
+# Copy dependency files first
+COPY pyproject.toml uv.lock ./
 
-COPY pyproject.toml .
+# Install dependencies
+ENV UV_COMPILE_BYTECODE=1
+RUN uv sync --frozen --no-install-project --no-dev
+
+# Add the created virtual environment to the PATH
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Copy the application code
 COPY main.py .
-
-RUN uv pip install --system -r pyproject.toml
+COPY youtube_api.py .
 
 ENV PORT=8080
 EXPOSE 8080
@@ -16,4 +26,4 @@ EXPOSE 8080
 ENV GRADIO_SERVER_NAME="0.0.0.0"
 ENV GRADIO_SERVER_PORT=8080
 
-CMD ["uv", "run", "main.py"]
+CMD ["/app/.venv/bin/python", "main.py"]

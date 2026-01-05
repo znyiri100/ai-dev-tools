@@ -1,35 +1,45 @@
-FROM python:3.11-slim
+# Stage 1: Builder
+FROM python:3.11-slim AS builder
+
+# Copy uv binary
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Install system dependencies (if needed, e.g. for psycopg2)
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc \
+    gcc \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files
-COPY pyproject.toml .
-# COPY uv.lock . # If you want locked versions
+COPY pyproject.toml uv.lock ./
 
-# Install dependencies using pip (simpler for Cloud Run than setting up uv in image, but uv is fine too)
-# We'll use pip for compatibility with standard python images, or install uv.
-# Let's use pip to read pyproject.toml if possible, or export requirements.
-# UV is faster. Let's install uv.
-RUN pip install uv
+# Install dependencies using cached uv directory
+ENV UV_COMPILE_BYTECODE=1
+RUN uv sync --frozen --no-install-project --no-dev
 
-# Install dependencies
-# We assume the project file structure. 
-# We need to copy the backend code.
+# Stage 2: Runtime
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+# Install minimal runtime dependencies
+# libpq5 is often needed for postgres interaction even with binary wheels
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Add virtual environment to PATH
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Copy application code
 COPY . .
 
-# Install dependencies into system python
-RUN uv pip install --system -r pyproject.toml
-
-# Expose port (Cloud Run defaults to 8080)
 ENV PORT=8080
 EXPOSE 8080
 
-# Command to run the application
-# Command to run the application
-# Cloud Run expects the app to listen on the port defined by the PORT environment variable (default 8080)
 CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8080}"]

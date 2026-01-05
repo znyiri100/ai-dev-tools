@@ -1,0 +1,11 @@
+.git
+.gitignore
+.dockerignore
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+*.duckdb
+tests/
+docs/

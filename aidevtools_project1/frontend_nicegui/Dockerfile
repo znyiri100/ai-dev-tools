@@ -1,31 +1,43 @@
-FROM python:3.11-slim
+# Stage 1: Builder
+FROM python:3.11-slim AS builder
+
+# Copy uv binary
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv (using the standalone installer is robust)
-RUN pip install uv
-
 # Copy dependency files
-COPY pyproject.toml .
-# COPY uv.lock . # Uncomment if you have a lockfile and want reproducible builds
+COPY pyproject.toml uv.lock ./
 
-# Install dependencies into system python
-# --system installs into the python environment directly since we are in a container
-RUN uv pip install --system -r pyproject.toml
+# Install dependencies using cached uv directory
+ENV UV_COMPILE_BYTECODE=1
+RUN uv sync --frozen --no-install-project --no-dev
+
+# Stage 2: Runtime
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Add virtual environment to PATH
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy application code
 COPY . .
 
-# Expose port (Cloud Run defaults to 8080)
 ENV PORT=8080
 EXPOSE 8080
 
-# Command to run the application
-# We use 'python main.py' because main.py invokes ui.run()
-# We assume main.py has been updated to listen on 0.0.0.0 and use $PORT
 CMD ["python", "main.py"]
