@@ -152,22 +152,36 @@ def list_transcripts_json(video_id: str, include_transcript: bool = False):
     }
 
     try:
+        HTTP_PROXY = os.getenv("HTTP_PROXY")
         HTTP_PROXY_USER = os.getenv("HTTP_PROXY_USER")
         HTTP_PROXY_PASS = os.getenv("HTTP_PROXY_PASS")
         api = None
         
-        if HTTP_PROXY_USER and HTTP_PROXY_PASS:
+        if HTTP_PROXY:
             try:
+                masked_proxy = re.sub(r":([^@/]+)@", ":****@", HTTP_PROXY)
+                print(f"Using GenericProxyConfig: {masked_proxy}", file=sys.stderr)
+                api = YouTubeTranscriptApi(proxy_config=GenericProxyConfig(
+                    http_url=HTTP_PROXY,
+                    https_url=HTTP_PROXY
+                ))
+            except Exception as e:
+                print(f"GenericProxyConfig failed: {e}", file=sys.stderr)
+                raise e
+
+        elif HTTP_PROXY_USER and HTTP_PROXY_PASS:
+            try:
+                print(f"Using WebshareProxyConfig with user: {HTTP_PROXY_USER}", file=sys.stderr)
                 api = YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
                     proxy_username=HTTP_PROXY_USER,
                     proxy_password=HTTP_PROXY_PASS,
                 ))
-                print(f"Webshare config success: HTTP_PROXY_USER={HTTP_PROXY_USER}", file=sys.stderr)
             except Exception as e:
-                print(f"Webshare config failed, falling back: {e}", file=sys.stderr)
+                print(f"WebshareProxyConfig failed: {e}", file=sys.stderr)
+                raise e
             
         else:
-            print(f"Webshare config not set, falling back to no proxy", file=sys.stderr)
+            print(f"Using no proxy", file=sys.stderr)
             api = YouTubeTranscriptApi()
 
         try:

@@ -39,6 +39,22 @@ This project provides tools to discover, fetch, and store YouTube video transcri
     export POSTGRES_PASSWORD="your-password"
     ```
 
+4.  **Configure Proxy (Optional):**
+    If you are running this in an environment that requires a proxy (e.g., to avoid YouTube IP blocks), you can configure it using environment variables.
+
+    *Generic Proxy:*
+    ```bash
+    export HTTP_PROXY="http://user:pass@host:port"
+    ```
+
+    *Webshare Proxy:*
+    (If using Webshare.io credential rotation)
+    ```bash
+    export HTTP_PROXY_USER="your-username"
+    export HTTP_PROXY_PASS="your-password"
+    ```
+    *Note: `HTTP_PROXY` takes precedence over Webshare credentials if both are set.*
+
 ## Tools & Usage
 
 ### 1. Database Management (`database.py` & `load_data.py`)
