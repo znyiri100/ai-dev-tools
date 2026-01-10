@@ -30,21 +30,7 @@ The deployment process now utilizes:
 *   **Caching**: Reuses built layers to make subsequent deployments faster.
 *   **.gcloudignore**: Prevents uploading unnecessary local files (like `.venv`, `__pycache__`) to Cloud Build.
 
-## 2. Handling YouTube "Sign in to confirm you’re not a bot"
-Cloud IP addresses are often flagged by YouTube. To fix this, you must provide a `cookies.txt` file.
-
-1.  **Install a Cookie Exporter**: Use a browser extension like "Get cookies.txt LOCALLY" (Chrome) or "cookies.txt" (Firefox).
-2.  **Export YouTube Cookies**:
-    *   Go to [YouTube.com](https://www.youtube.com) and ensure you are logged in.
-    *   Use the extension to export your cookies in **Netscape format**.
-    *   Save the file as `cookies.txt`.
-3.  **Place the file**:
-    *   Copy `cookies.txt` into the `backend/` directory.
-    *   Copy `cookies.txt` into the `frontend_nicegui/` directory.
-    *   *Note: `cookies.txt` contains sensitive session data. Do not commit it to public git repositories.*
-4.  **Redeploy**: Run `./deploy_cloud_run.sh` again. The file will be automatically included in the container.
-
-## 3. Configuration (Environment Variables)
+## 2. Configuration (Environment Variables)
 
 You can configure your services using either **Plain Environment Variables** (easiest) or **Google Secret Manager** (recommended for production).
 

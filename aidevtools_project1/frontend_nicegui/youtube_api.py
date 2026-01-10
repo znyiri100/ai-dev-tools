@@ -40,11 +40,6 @@ def search_videos(topic, limit=5):
     else:
         print("DEBUG: Node not found, skipping js_runtimes configuration")
 
-    # Use cookies if available
-    if os.path.exists("cookies.txt"):
-        ydl_opts['cookiefile'] = "cookies.txt"
-        print("DEBUG: Using cookies.txt for search")
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # ytsearchN:query searches for N results

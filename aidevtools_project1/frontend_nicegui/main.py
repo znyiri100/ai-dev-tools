@@ -990,12 +990,27 @@ Transcript:
         with ui.tab_panel(docs_tab):
             ui.label('System Documentation').classes('text-h4 mb-4')
             try:
-                # Check for local docs (container) first, then parent (local dev)
-                current_dir = Path(__file__).resolve().parent
-                if (current_dir / "docs").exists():
-                    base_path = current_dir / "docs"
-                else:
-                    base_path = current_dir.parent / "docs"
+                # Robust search for docs directory
+                # 1. Co-located (Docker/Deployment where docs are copied to ./docs)
+                # 2. Parent directory (Local Dev where docs are in ../docs)
+                # 3. Explicit /app/docs (Docker fallback)
+                candidates = [
+                    Path(__file__).parent / "docs",
+                    Path(__file__).parent.parent / "docs",
+                    Path("/app/docs")
+                ]
+                
+                base_path = None
+                for p in candidates:
+                    # Check for a key file to validate the directory
+                    if p.exists() and (p / "project_vision.md").exists():
+                        base_path = p
+                        break
+                
+                if not base_path:
+                    ui.label(f"Documentation directory not found. Searched: {[str(c) for c in candidates]}").classes('text-red')
+                    raise FileNotFoundError("Docs directory not found")
+
                 erd_path = base_path / "erd.mmd"
                 flow_path = base_path / "flow.mmd"
                 workflow_path = base_path / "workflow.mmd"
@@ -1005,26 +1020,41 @@ Transcript:
                 # App Explanation
                 ui.markdown(ABOUT_TEXT).classes('text-lg')
 
-                # 1. User Workflow Diagram (Top)
-                ui.label('User Workflow').classes('text-h6 font-bold mt-4 mb-2')
+                # 1. User Workflow Diagram
+                ui.label('1. User Workflow').classes('text-h6 font-bold mt-4 mb-2')
                 if workflow_path.exists():
                     ui.mermaid(workflow_path.read_text()).classes('w-full border p-4 bg-gray-50')
                 else:
                     ui.label(f'workflow.mmd not found').classes('text-red')
 
+                # 2. Program Flow & Architecture
+                ui.label('2. Program Flow & Architecture').classes('text-h6 font-bold mt-6 mb-2')
+                if prog_path.exists():
+                    ui.markdown(prog_path.read_text()).classes('w-full border p-4 bg-gray-50')
+                else:
+                    ui.label(f'program_flow.md not found').classes('text-red')
+
                 # 3. System Flow Diagram
-                ui.label('System Architecture').classes('text-h6 font-bold mt-6 mb-2')
+                ui.label('3. System Architecture (Flow)').classes('text-h6 font-bold mt-6 mb-2')
                 if flow_path.exists():
                     ui.mermaid(flow_path.read_text()).classes('w-full border p-4 bg-gray-50')
                 else:
                     ui.label(f'flow.mmd not found').classes('text-red')
                 
-                # 4. ERD (at bottom)
-                ui.label('Data Model (ERD)').classes('text-h6 font-bold mt-6 mb-2')
+                # 4. Data Model (ERD)
+                ui.label('4. Data Model (ERD)').classes('text-h6 font-bold mt-6 mb-2')
                 if erd_path.exists():
                     ui.mermaid(erd_path.read_text()).classes('w-full border p-4 bg-gray-50')
                 else:
                     ui.label(f'erd.mmd not found').classes('text-red')
+
+                # 5. Project Vision
+                ui.label('5. Project Vision & Roadmap').classes('text-h6 font-bold mt-6 mb-2')
+                if vis_path.exists():
+                    ui.markdown(vis_path.read_text()).classes('w-full border p-4 bg-gray-50')
+                else:
+                    ui.label(f'project_vision.md not found').classes('text-red')
+
             except Exception as e:
                 ui.label(f"Error loading docs: {e}").classes('text-red')
 
