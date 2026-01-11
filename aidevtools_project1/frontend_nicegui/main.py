@@ -7,6 +7,7 @@ from youtube_api import search_videos
 import shutil
 import sys
 import re
+import os
 
 ABOUT_TEXT = """
 ### Welcome to Learnify!
@@ -183,6 +184,13 @@ Transcript:
                     'node': {'args': [node_path] if node_path else []},
                 },
             }
+
+            # Use proxy if available
+            http_proxy = os.getenv("HTTP_PROXY_YT_DLP")
+            if http_proxy:
+                ydl_opts['proxy'] = http_proxy
+                print(f"DEBUG: Using proxy for yt-dlp: {http_proxy}")
+
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 video_url = f"https://www.youtube.com/watch?v={video_id}"
                 return ydl.extract_info(video_url, download=False)

@@ -45,12 +45,9 @@ First, export your secrets as environment variables in your current shell (e.g. 
 Then run the following commands to create the secrets, grant access to the Cloud Run service account, and update the backend service:
 
 ```bash
-printf "$POSTGRES_HOST" | gcloud secrets create postgres-host --data-file=-
-printf "$POSTGRES_USER" | gcloud secrets create postgres-user --data-file=-
-printf "$POSTGRES_PASSWORD" | gcloud secrets create postgres-password --data-file=-
-printf "$POSTGRES_DATABASE" | gcloud secrets create postgres-db --data-file=-
-printf "$YOUTUBE_API_KEY" | gcloud secrets create youtube-api-key --data-file=-
 printf "$GOOGLE_API_KEY" | gcloud secrets create google-api-key --data-file=-
+printf "$HTTP_PROXY" | gcloud secrets create http-proxy --data-file=-
+--data-file=-
 printf "$HTTP_PROXY_USER" | gcloud secrets create http-proxy-user --data-file=-
 printf "$HTTP_PROXY_PASS" | gcloud secrets create http-proxy-pass --data-file=-
 
@@ -65,8 +62,13 @@ gcloud run services update aidevtools-backend \
     --update-secrets POSTGRES_HOST=postgres-host:latest,POSTGRES_USER=postgres-user:latest,POSTGRES_PASSWORD=postgres-password:latest,POSTGRES_DATABASE=postgres-db:latest
 gcloud run services update aidevtools-backend --region us-central1 --update-secrets YOUTUBE_API_KEY=youtube-api-key:latest
 gcloud run services update aidevtools-backend --region us-central1 --update-secrets GOOGLE_API_KEY=google-api-key:latest
+gcloud run services update aidevtools-backend --region us-central1 --update-secrets HTTP_PROXY=http-proxy:latest
 gcloud run services update aidevtools-backend --region us-central1 --update-secrets HTTP_PROXY_USER=http-proxy-user:latest
 gcloud run services update aidevtools-backend --region us-central1 --update-secrets HTTP_PROXY_PASS=http-proxy-pass:latest
+
+# frontend secrets
+printf "$HTTP_PROXY_YT_DLP" | gcloud secrets create http-proxy-yt-dlp 
+gcloud run services update aidevtools-frontend --region europe-west1 --update-secrets HTTP_PROXY_YT_DLP=http-proxy-yt-dlp:latest
 ```
 
 ### Option B: Plain Environment Variables (Quick)
@@ -76,8 +78,10 @@ If you strictly want to test quickly and don't mind secrets being visible in the
 ```bash
 gcloud run services update aidevtools-backend \
   --region us-central1 \
-  --update-env-vars POSTGRES_HOST=db.example.com,POSTGRES_USER=postgres,POSTGRES_PASSWORD=secret,POSTGRES_DATABASE=postgres,YOUTUBE_API_KEY=your_key
+  --update-env-vars POSTGRES_HOST=db.example.com,POSTGRES_USER=postgres,POSTGRES_PASSWORD=secret,POSTGRES_DATABASE=postgres,YOUTUBE_API_KEY=your_key,HTTP_PROXY=http://user:pass@host:port
 ```
+*   **HTTP_PROXY**: (Optional) Proxy URL (e.g., `http://user:pass@host:port`) used by the backend to fetch transcripts and metadata.
+*   **HTTP_PROXY_YT_DLP**: (Optional) Proxy URL (e.g., `http://user:pass@host:port`) used by `yt-dlp` in the frontend to fetch video metadata and details.
 
 ---
 

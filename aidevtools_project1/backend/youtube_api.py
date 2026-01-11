@@ -71,6 +71,12 @@ def get_video_metadata(video_id: str) -> dict:
             },
         }
 
+        # Use proxy if available
+        http_proxy = os.getenv("HTTP_PROXY")
+        if http_proxy:
+            ydl_opts['proxy'] = http_proxy
+            print(f"DEBUG: Using proxy for yt-dlp: {http_proxy}", file=sys.stderr)
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             url = f"https://www.youtube.com/watch?v={video_id}"
             info = ydl.extract_info(url, download=False)

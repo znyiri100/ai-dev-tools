@@ -3,6 +3,7 @@ import json
 import yt_dlp
 import shutil
 import sys
+import os
 
 class YtDlpLogger:
     def debug(self, msg):
@@ -39,6 +40,16 @@ def search_videos(topic, limit=5):
         print(f"DEBUG: Configured js_runtimes with node: {node_path}")
     else:
         print("DEBUG: Node not found, skipping js_runtimes configuration")
+
+    # Use proxy if available
+    http_proxy_yt_dlp = os.getenv("HTTP_PROXY_YT_DLP")
+    if http_proxy_yt_dlp:
+        ydl_opts['proxy'] = http_proxy_yt_dlp
+        import re
+        masked_proxy = re.sub(r'(:[^:@/]+)@', ':***@', http_proxy_yt_dlp)
+        print(f"DEBUG: Search videos, using proxy for yt-dlp: {masked_proxy}")
+    else:
+        print("DEBUG: Search videos, no proxy for yt-dlp")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
