@@ -14,6 +14,10 @@ This project is configured for deployment on **Google Cloud Run**.
 We have provided a helper script to deploy both services:
 
 ```bash
+# for example:
+#   gcloud config set project project-japi
+#   ./deploy_cloud_run.sh project-japi us-central1
+# or...
 PROJECT_ID=$(gcloud config get-value project)
 REGION=us-central1
 ./deploy_cloud_run.sh $PROJECT_ID $REGION
@@ -45,30 +49,62 @@ First, export your secrets as environment variables in your current shell (e.g. 
 Then run the following commands to create the secrets, grant access to the Cloud Run service account, and update the backend service:
 
 ```bash
-printf "$GOOGLE_API_KEY" | gcloud secrets create google-api-key --data-file=-
-printf "$HTTP_PROXY" | gcloud secrets create http-proxy --data-file=-
---data-file=-
-printf "$HTTP_PROXY_USER" | gcloud secrets create http-proxy-user --data-file=-
-printf "$HTTP_PROXY_PASS" | gcloud secrets create http-proxy-pass --data-file=-
-
 PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
 SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
     --member="serviceAccount:${SERVICE_ACCOUNT}" \
     --role="roles/secretmanager.secretAccessor"
 
-gcloud run services update aidevtools-backend \
+# secrets
+(echo "POSTGRES_HOST: $POSTGRES_HOST"
+echo "POSTGRES_USER_PROJECT1: $POSTGRES_USER_PROJECT1"
+echo "POSTGRES_PASSWORD_PROJECT1: $POSTGRES_PASSWORD_PROJECT1"
+echo "POSTGRES_DATABASE_PROJECT1: $POSTGRES_DATABASE_PROJECT1"
+echo "YOUTUBE_API_KEY: $YOUTUBE_API_KEY"
+echo "GOOGLE_API_KEY: $GOOGLE_API_KEY"
+echo "HTTP_PROXY_USER: $HTTP_PROXY_USER"
+echo "HTTP_PROXY_PASS: $HTTP_PROXY_PASS"
+echo "HTTP_PROXY_YT_DLP: $HTTP_PROXY_YT_DLP"
+)
+printf "$POSTGRES_HOST" | gcloud secrets create postgres-host --data-file=-
+printf "$POSTGRES_USER_PROJECT1" | gcloud secrets create postgres-user-project1 --data-file=-
+printf "$POSTGRES_PASSWORD_PROJECT1" | gcloud secrets create postgres-password-project1 --data-file=-
+printf "$POSTGRES_DATABASE_PROJECT1" | gcloud secrets create postgres-database-project1 --data-file=-
+printf "$YOUTUBE_API_KEY" | gcloud secrets create youtube-api-key --data-file=-
+printf "$GOOGLE_API_KEY" | gcloud secrets create google-api-key --data-file=-
+printf "$HTTP_PROXY_USER" | gcloud secrets create http-proxy-user --data-file=-
+printf "$HTTP_PROXY_PASS" | gcloud secrets create http-proxy-pass --data-file=-
+printf "$HTTP_PROXY_YT_DLP" | gcloud secrets create http-proxy-yt-dlp --data-file=-
+
+# or add new version to existing secret
+printf "$POSTGRES_HOST" | gcloud secrets versions add postgres-host --data-file=-
+printf "$POSTGRES_USER_PROJECT1" | gcloud secrets versions add postgres-user-project1 --data-file=-
+printf "$POSTGRES_PASSWORD_PROJECT1" | gcloud secrets versions add postgres-password-project1 --data-file=-
+printf "$POSTGRES_DATABASE_PROJECT1" | gcloud secrets versions add postgres-database-project1 --data-file=-
+printf "$YOUTUBE_API_KEY" | gcloud secrets versions add youtube-api-key --data-file=-
+printf "$GOOGLE_API_KEY" | gcloud secrets versions add google-api-key --data-file=-
+printf "$HTTP_PROXY_USER" | gcloud secrets versions add http-proxy-user --data-file=-
+printf "$HTTP_PROXY_PASS" | gcloud secrets versions add http-proxy-pass --data-file=-
+printf "$HTTP_PROXY_YT_DLP" | gcloud secrets versions add http-proxy-yt-dlp --data-file=-
+
+# list
+gcloud secrets list
+gcloud secrets versions access latest --secret="postgres-host"
+gcloud secrets versions access latest --secret="postgres-user-project1"
+gcloud secrets versions access latest --secret="postgres-password-project1"
+gcloud secrets versions access latest --secret="postgres-database-project1"
+gcloud secrets versions access latest --secret="youtube-api-key"
+gcloud secrets versions access latest --secret="google-api-key"
+gcloud secrets versions access latest --secret="http-proxy-user"
+gcloud secrets versions access latest --secret="http-proxy-pass"
+gcloud secrets versions access latest --secret="http-proxy-yt-dlp"
+
+gcloud run services update aidevtools-project1-backend \
     --region us-central1 \
-    --update-secrets POSTGRES_HOST=postgres-host:latest,POSTGRES_USER=postgres-user:latest,POSTGRES_PASSWORD=postgres-password:latest,POSTGRES_DATABASE=postgres-db:latest
-gcloud run services update aidevtools-backend --region us-central1 --update-secrets YOUTUBE_API_KEY=youtube-api-key:latest
-gcloud run services update aidevtools-backend --region us-central1 --update-secrets GOOGLE_API_KEY=google-api-key:latest
-gcloud run services update aidevtools-backend --region us-central1 --update-secrets HTTP_PROXY=http-proxy:latest
-gcloud run services update aidevtools-backend --region us-central1 --update-secrets HTTP_PROXY_USER=http-proxy-user:latest
-gcloud run services update aidevtools-backend --region us-central1 --update-secrets HTTP_PROXY_PASS=http-proxy-pass:latest
+    --update-secrets POSTGRES_HOST=postgres-host:latest,POSTGRES_USER=postgres-user-project1:latest,POSTGRES_PASSWORD=postgres-password-project1:latest,POSTGRES_DATABASE=postgres-database-project1:latest,YOUTUBE_API_KEY=youtube-api-key:latest,GOOGLE_API_KEY=google-api-key:latest,HTTP_PROXY_USER=http-proxy-user:latest,HTTP_PROXY_PASS=http-proxy-pass:latest,HTTP_PROXY_YT_DLP=http-proxy-yt-dlp:latest
 
 # frontend secrets
-printf "$HTTP_PROXY_YT_DLP" | gcloud secrets create http-proxy-yt-dlp 
-gcloud run services update aidevtools-frontend --region europe-west1 --update-secrets HTTP_PROXY_YT_DLP=http-proxy-yt-dlp:latest
+gcloud run services update aidevtools-project1-frontend --region us-central1 --update-secrets HTTP_PROXY_YT_DLP=http-proxy-yt-dlp:latest
 ```
 
 ### Option B: Plain Environment Variables (Quick)
@@ -78,7 +114,7 @@ If you strictly want to test quickly and don't mind secrets being visible in the
 ```bash
 gcloud run services update aidevtools-backend \
   --region us-central1 \
-  --update-env-vars POSTGRES_HOST=db.example.com,POSTGRES_USER=postgres,POSTGRES_PASSWORD=secret,POSTGRES_DATABASE=postgres,YOUTUBE_API_KEY=your_key,HTTP_PROXY=http://user:pass@host:port
+  --update-env-vars POSTGRES_HOST=db.example.com,POSTGRES_USER=postgres,POSTGRES_PASSWORD=secret,POSTGRES_DATABASE=postgres,YOUTUBE_API_KEY=your_key,HTTP_PROXY=http://user:pass@host:port,HTTP_PROXY_YT_DLP=http://user:pass@host:port
 ```
 *   **HTTP_PROXY**: (Optional) Proxy URL (e.g., `http://user:pass@host:port`) used by the backend to fetch transcripts and metadata.
 *   **HTTP_PROXY_YT_DLP**: (Optional) Proxy URL (e.g., `http://user:pass@host:port`) used by `yt-dlp` in the frontend to fetch video metadata and details.

@@ -2,11 +2,12 @@
 
 # Cloud Run Deployment Script
 # Usage: ./deploy_cloud_run.sh [PROJECT_ID] [REGION]
+# For example: ./deploy_cloud_run.sh DataTalks us-central1
 
 PROJECT_ID=${1:-$(gcloud config get-value project)}
 REGION=${2:-"us-central1"}
-BACKEND_SERVICE="aidevtools-backend"
-FRONTEND_SERVICE="aidevtools-frontend"
+BACKEND_SERVICE="aidevtools-project1-backend"
+FRONTEND_SERVICE="aidevtools-project1-frontend"
 
 if [ -z "$PROJECT_ID" ]; then
     echo "Error: PROJECT_ID is not set. Please provide it as the first argument or run 'gcloud config set project <PROJECT_ID>'."

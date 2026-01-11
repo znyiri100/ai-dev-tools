@@ -45,6 +45,8 @@ This project provides tools to discover, fetch, and store YouTube video transcri
     *Generic Proxy:*
     ```bash
     export HTTP_PROXY="http://user:pass@host:port"
+    # Or specifically for yt-dlp (recommended for backend):
+    export HTTP_PROXY_YT_DLP="http://user:pass@host:port"
     ```
 
     *Webshare Proxy:*

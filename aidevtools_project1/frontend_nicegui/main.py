@@ -1003,8 +1003,8 @@ Transcript:
                 # 2. Parent directory (Local Dev where docs are in ../docs)
                 # 3. Explicit /app/docs (Docker fallback)
                 candidates = [
-                    Path(__file__).parent / "docs",
-                    Path(__file__).parent.parent / "docs",
+                    Path(__file__).resolve().parent / "docs",
+                    Path(__file__).resolve().parent.parent / "docs",
                     Path("/app/docs")
                 ]
                 

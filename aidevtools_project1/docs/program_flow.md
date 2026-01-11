@@ -54,13 +54,3 @@ The application is designed as a decoupled system with a **FastAPI backend** han
 4. Backend constructs a prompt including the Study Guide + Chat History + User Message.
 5. Backend streams the LLM response back to the Frontend.
 6. Frontend updates the UI in real-time.
-
-## Data Model (ERD)
-
-![ERD Diagram](erd.svg)
-*Refer to `erd.mmd` for source.*
-
-## System Flow
-
-![Flow Diagram](flow.svg)
-*Refer to `flow.mmd` for source.*

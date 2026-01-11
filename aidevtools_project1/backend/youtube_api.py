@@ -72,10 +72,11 @@ def get_video_metadata(video_id: str) -> dict:
         }
 
         # Use proxy if available
-        http_proxy = os.getenv("HTTP_PROXY")
+        http_proxy = os.getenv("HTTP_PROXY_YT_DLP") or os.getenv("HTTP_PROXY")
         if http_proxy:
             ydl_opts['proxy'] = http_proxy
-            print(f"DEBUG: Using proxy for yt-dlp: {http_proxy}", file=sys.stderr)
+            masked_proxy = re.sub(r':([^:@]+)@', ':****@', http_proxy)
+            print(f"DEBUG: Using proxy for yt-dlp: {masked_proxy}", file=sys.stderr)
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             url = f"https://www.youtube.com/watch?v={video_id}"
@@ -153,7 +154,7 @@ def list_transcripts_json(video_id: str, include_transcript: bool = False):
     }
 
     try:
-        HTTP_PROXY = os.getenv("HTTP_PROXY")
+        HTTP_PROXY = os.getenv("HTTP_PROXY_YT_DLP") or os.getenv("HTTP_PROXY")
         HTTP_PROXY_USER = os.getenv("HTTP_PROXY_USER")
         HTTP_PROXY_PASS = os.getenv("HTTP_PROXY_PASS")
         api = None
