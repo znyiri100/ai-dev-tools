@@ -123,7 +123,22 @@ def get_video_metadata(video_id: str) -> dict:
             return {"error": str(e2)}
 
 def _format_timestamp(seconds: float) -> str:
-    """Format a timestamp in seconds to YouTube-style M:SS or H:MM:SS format."""
+    """Format a timestamp in seconds to YouTube-style M:SS or H:MM:SS format.
+
+    YouTube stores caption timing as a floating-point number of seconds from
+    the start of the video (e.g. 20.0, 26.4, 3661.0).  This helper converts
+    that value into the compact human-readable form shown in YouTube's
+    transcript panel:
+
+    * Videos under one hour → ``M:SS``  (e.g. ``0:20``, ``1:05``, ``59:59``)
+    * Videos one hour or longer → ``H:MM:SS``  (e.g. ``1:00:00``, ``2:02:02``)
+
+    Args:
+        seconds: Elapsed time in seconds from the beginning of the video.
+
+    Returns:
+        A string timestamp in ``M:SS`` or ``H:MM:SS`` format.
+    """
     total_seconds = int(seconds)
     hours = total_seconds // 3600
     minutes = (total_seconds % 3600) // 60
@@ -157,8 +172,42 @@ def get_transcript_text(transcript_obj):
 def get_transcript_with_timestamps(transcript_obj):
     """Fetch transcript data and return text with YouTube-style timestamps.
 
-    Each line is formatted as ``[M:SS] text``, matching the timestamp display
-    shown in YouTube's transcript panel.
+    **How the timestamps work**
+
+    YouTube stores every caption track as a timed text file (e.g. a ``.srv3``
+    or WebVTT ``.vtt`` file) that YouTube's servers generate from either a
+    manual upload or automatic speech recognition.  Each caption entry in that
+    file carries three fields:
+
+    * ``start``    – when the caption appears, in seconds from the video start
+      (e.g. ``20.0`` for the 0:20 mark)
+    * ``duration`` – how many seconds it stays on screen (e.g. ``3.5``)
+    * ``text``     – the words spoken during that window
+
+    The ``youtube-transcript-api`` library downloads that caption file and
+    exposes each entry as a ``FetchedTranscriptSnippet`` object (or a plain
+    dict in older library versions).  This function reads the ``start`` field
+    from every snippet, converts it to a human-readable ``[M:SS]`` label via
+    :func:`_format_timestamp`, and prepends it to the caption text:
+
+    .. code-block:: text
+
+        [0:20] In today's tech check. Tell us all about it.
+        [0:26] So according to a memo obtained by The Information...
+        [0:34] Google's recent progress could create some temporary...
+
+    The result mirrors exactly what you see in YouTube's built-in transcript
+    panel (shown in the screenshot that prompted this feature).
+
+    Args:
+        transcript_obj: A transcript object returned by
+            ``YouTubeTranscriptApi.list(video_id)``.  Its ``.fetch()`` method
+            must return an iterable of snippet objects or dicts that each
+            expose a ``start`` (float, seconds) and ``text`` (str) field.
+
+    Returns:
+        A newline-separated string where every line is ``[M:SS] caption text``.
+        On error, returns a string starting with ``"ERROR fetching transcript:"``.
     """
     try:
         data = transcript_obj.fetch()
