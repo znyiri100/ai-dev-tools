@@ -9,6 +9,38 @@ This project provides tools to discover, fetch, and store YouTube video transcri
 - **SQLAlchemy ORM:** Clean data models and easy migrations.
 - **Topic Search:** Find videos by topic and automatically store their metadata.
 
+## YouTube Libraries & APIs
+
+This project uses three different libraries/services to interact with YouTube:
+
+| Library / Service | Pip Package | Purpose |
+|---|---|---|
+| **`youtube-transcript-api`** | `youtube-transcript-api` | **Primary transcript library.** Lists all available transcripts (languages, auto-generated vs. manual) and fetches the full transcript text for a given video ID. Used directly in `youtube_api.py`. |
+| **`yt-dlp`** | `yt-dlp` | Extracts video metadata (title, author, view count, duration). Also used in the frontend to search videos by topic via `ytsearchN:<query>` syntax. |
+| **Google YouTube Data API v3** | `google-api-python-client` | Topic-based video search in the backend. Requires a `YOUTUBE_API_KEY` from [Google Cloud Console](https://console.cloud.google.com/). |
+| **MCP Docker container** (`mcp/youtube-transcript`) | `mcp` (client) | Alternative transcript-fetching path via `youtube_mcp.py`. Runs `youtube-transcript-api` inside a Docker container and communicates via the Model Context Protocol (MCP). |
+
+### Quick Example — fetching a transcript in Python
+
+```python
+from youtube_transcript_api import YouTubeTranscriptApi
+
+api = YouTubeTranscriptApi()
+
+# List available transcripts for a video
+transcript_list = api.list("EMd3H0pNvSE")
+for t in transcript_list:
+    print(t.language, t.language_code, "auto:", t.is_generated)
+
+# Fetch the English transcript text
+transcript = next(t for t in transcript_list if t.language_code == "en")
+snippets = transcript.fetch()
+full_text = " ".join(snippet.text for snippet in snippets)
+print(full_text[:300])
+```
+
+---
+
 ## Prerequisites
 
 - [Docker](https://www.docker.com/) installed and running.
