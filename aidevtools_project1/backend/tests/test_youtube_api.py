@@ -5,8 +5,10 @@ from backend.youtube_api import (
     extract_video_id,
     get_video_metadata,
     get_transcript_text,
+    get_transcript_with_timestamps,
     list_transcripts_json,
-    search_youtube_videos
+    search_youtube_videos,
+    _format_timestamp,
 )
 
 def test_extract_video_id():
@@ -79,6 +81,51 @@ def test_get_transcript_text_obj():
     text = get_transcript_text(mock_transcript)
     assert text == "Hello world"
 
+def test_format_timestamp():
+    """Test YouTube-style M:SS / H:MM:SS timestamp formatting."""
+    assert _format_timestamp(0) == "0:00"
+    assert _format_timestamp(20) == "0:20"
+    assert _format_timestamp(60) == "1:00"
+    assert _format_timestamp(65.5) == "1:05"
+    assert _format_timestamp(3599) == "59:59"
+    assert _format_timestamp(3600) == "1:00:00"
+    assert _format_timestamp(3661) == "1:01:01"
+    assert _format_timestamp(7322) == "2:02:02"
+
+def test_get_transcript_with_timestamps_dict():
+    """Test timestamped transcript from list of snippet dicts."""
+    mock_transcript = MagicMock()
+    mock_transcript.fetch.return_value = [
+        {'text': 'Hello world', 'start': 20.0, 'duration': 3.5},
+        {'text': 'Second line', 'start': 26.0, 'duration': 4.0},
+    ]
+
+    result = get_transcript_with_timestamps(mock_transcript)
+    assert result == "[0:20] Hello world\n[0:26] Second line"
+
+def test_get_transcript_with_timestamps_obj():
+    """Test timestamped transcript from list of snippet objects."""
+    snippet1 = MagicMock()
+    snippet1.start = 20.0
+    snippet1.text = 'Hello world'
+    snippet2 = MagicMock()
+    snippet2.start = 26.0
+    snippet2.text = 'Second line'
+
+    mock_transcript = MagicMock()
+    mock_transcript.fetch.return_value = [snippet1, snippet2]
+
+    result = get_transcript_with_timestamps(mock_transcript)
+    assert result == "[0:20] Hello world\n[0:26] Second line"
+
+def test_get_transcript_with_timestamps_error():
+    """Test that fetch errors are handled gracefully."""
+    mock_transcript = MagicMock()
+    mock_transcript.fetch.side_effect = Exception("network error")
+
+    result = get_transcript_with_timestamps(mock_transcript)
+    assert result.startswith("ERROR fetching transcript:")
+
 @patch('backend.youtube_api.YouTubeTranscriptApi')
 @patch('backend.youtube_api.get_video_metadata')
 def test_list_transcripts_json(mock_metadata, mock_api):
@@ -108,6 +155,32 @@ def test_list_transcripts_json(mock_metadata, mock_api):
     assert result["video_id"] == "12345678901"
     assert len(result["transcripts"]) == 1
     assert result["transcripts"][0]["language_code"] == "en"
+
+@patch('backend.youtube_api.YouTubeTranscriptApi')
+@patch('backend.youtube_api.get_video_metadata')
+def test_list_transcripts_json_with_timestamps(mock_metadata, mock_api):
+    """Test that include_timestamps adds transcript_with_timestamps to each entry."""
+    mock_metadata.return_value = {"title": "Test"}
+
+    mock_transcript = MagicMock()
+    mock_transcript.language = "English"
+    mock_transcript.language_code = "en"
+    mock_transcript.is_generated = False
+    mock_transcript.is_translatable = True
+    mock_transcript.fetch.return_value = [
+        {'text': 'Hello', 'start': 20.0, 'duration': 3.0},
+        {'text': 'world', 'start': 26.0, 'duration': 2.0},
+    ]
+
+    mock_api_instance = mock_api.return_value
+    mock_api_instance.list.return_value = [mock_transcript]
+
+    result = list_transcripts_json("12345678901", include_timestamps=True)
+
+    assert len(result["transcripts"]) == 1
+    ts_text = result["transcripts"][0]["transcript_with_timestamps"]
+    assert ts_text == "[0:20] Hello\n[0:26] world"
+    assert "transcript" not in result["transcripts"][0]
 
 @patch('backend.youtube_api.build')
 @patch.dict(os.environ, {"YOUTUBE_API_KEY": "fake_key"})

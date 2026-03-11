@@ -122,6 +122,16 @@ def get_video_metadata(video_id: str) -> dict:
         except Exception as e2:
             return {"error": str(e2)}
 
+def _format_timestamp(seconds: float) -> str:
+    """Format a timestamp in seconds to YouTube-style M:SS or H:MM:SS format."""
+    total_seconds = int(seconds)
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    secs = total_seconds % 60
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
 def get_transcript_text(transcript_obj):
     """Fetch transcript data and return the full text."""
     try:
@@ -144,8 +154,44 @@ def get_transcript_text(transcript_obj):
         print(error_msg, file=sys.stderr)
         return error_msg
 
-def list_transcripts_json(video_id: str, include_transcript: bool = False):
-    """Retrieve all transcripts and return as a JSON-compatible dictionary."""
+def get_transcript_with_timestamps(transcript_obj):
+    """Fetch transcript data and return text with YouTube-style timestamps.
+
+    Each line is formatted as ``[M:SS] text``, matching the timestamp display
+    shown in YouTube's transcript panel.
+    """
+    try:
+        data = transcript_obj.fetch()
+        lines = []
+        for snippet in data:
+            if hasattr(snippet, 'start') and hasattr(snippet, 'text'):
+                start = snippet.start
+                text = snippet.text
+            elif isinstance(snippet, dict):
+                start = snippet.get('start', 0)
+                text = snippet.get('text', '')
+            else:
+                lines.append(str(snippet))
+                continue
+            timestamp = _format_timestamp(start)
+            lines.append(f"[{timestamp}] {text}")
+        return "\n".join(lines)
+    except Exception as e:
+        error_msg = f"ERROR fetching transcript: {str(e)}"
+        print(error_msg, file=sys.stderr)
+        return error_msg
+
+def list_transcripts_json(video_id: str, include_transcript: bool = False, include_timestamps: bool = False):
+    """Retrieve all transcripts and return as a JSON-compatible dictionary.
+
+    Args:
+        video_id: YouTube video ID.
+        include_transcript: When True, include the full plain-text transcript in
+            each transcript entry under the ``transcript`` key.
+        include_timestamps: When True, include a timestamped version of the
+            transcript (one ``[M:SS] text`` line per snippet) under the
+            ``transcript_with_timestamps`` key.
+    """
     result = {
         "video_id": video_id,
         "url": f"https://www.youtube.com/watch?v={video_id}",
@@ -199,6 +245,9 @@ def list_transcripts_json(video_id: str, include_transcript: bool = False):
                 
                 if include_transcript:
                     t_info["transcript"] = get_transcript_text(transcript)
+
+                if include_timestamps:
+                    t_info["transcript_with_timestamps"] = get_transcript_with_timestamps(transcript)
                     
                 result["transcripts"].append(t_info)
         except Exception as e:
@@ -269,6 +318,7 @@ def main():
     parser.add_argument('--topic', '-t', help='Search YouTube for videos by topic')
     parser.add_argument('--max-results', '-m', type=int, default=5, help='Max search results (1-50)')
     parser.add_argument('--transcript', action='store_true', help='Include full transcript text')
+    parser.add_argument('--timestamps', action='store_true', help='Include transcript with timestamps (e.g. [0:20] text)')
     parser.add_argument('--upload', action='store_true', help='Upload fetched metadata and transcript list to DuckDB')
     
     args = parser.parse_args()
@@ -289,7 +339,7 @@ def main():
 
     all_outputs = []
     for video_id in video_ids:
-        output_data = list_transcripts_json(video_id, include_transcript=args.transcript)
+        output_data = list_transcripts_json(video_id, include_transcript=args.transcript, include_timestamps=args.timestamps)
         all_outputs.append(output_data)
         
         # Optional Database Upload
