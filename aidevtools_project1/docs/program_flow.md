@@ -21,7 +21,11 @@ The application is designed as a decoupled system with a **FastAPI backend** han
   - orchestration of external services.
 
 ### 3. Data & Services
-- **YouTube Data**: Fetched using `yt-dlp` or internal APIs to get video metadata and transcripts.
+- **YouTube Data**: A combination of three libraries handles all YouTube interactions:
+  - [`youtube-transcript-api`](https://github.com/jdepoix/youtube-transcript-api) — Fetches the list of available transcripts (languages, auto-generated vs. manual) and the full transcript text for a given video ID. This is the **primary library used to retrieve transcript content**.
+  - [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) — Extracts rich video metadata (title, author/uploader, view count, duration) and powers topic-based video search from the frontend (`youtube_api.py`).
+  - [`google-api-python-client`](https://github.com/googleapis/google-api-python-client) (YouTube Data API v3) — Used in the backend (`youtube_api.py`) for topic-based video search. Requires a `YOUTUBE_API_KEY`.
+  - **MCP Docker container** (`mcp/youtube-transcript`) — An alternative transcript-fetching path used by `youtube_mcp.py`. It wraps `youtube-transcript-api` inside a Docker container and communicates via the Model Context Protocol (MCP).
 - **Database**: 
   - **SQLite/DuckDB/Postgres**: Stores video metadata and generated content (transcripts, study guides, quizzes).
   - Uses SQLAlchemy ORM for abstraction.
