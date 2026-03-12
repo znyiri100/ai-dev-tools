@@ -33,6 +33,7 @@ class TranscriptInfo(BaseModel):
     is_generated: Optional[bool]
     is_translatable: Optional[bool]
     transcript: Optional[str] = None
+    transcript_with_timestamps: Optional[str] = None
     study_guide: Optional[str] = None
     quiz: Optional[str] = None
 
@@ -228,13 +229,13 @@ def generate_quiz_endpoint(video_id: str, language_code: str, request: GenerateR
 
 
 @app.get("/api/v1/video/{video_id}", response_model=VideoResponse)
-def get_video_info(video_id: str, include_transcript: bool = False):
+def get_video_info(video_id: str, include_transcript: bool = False, include_timestamps: bool = False):
     """
     Fetch video metadata and available transcripts directly from YouTube.
     """
-    print(f"DEBUG: API get_video_info video_id={video_id} include_transcript={include_transcript}")
+    print(f"DEBUG: API get_video_info video_id={video_id} include_transcript={include_transcript} include_timestamps={include_timestamps}")
     real_id = youtube_api.extract_video_id(video_id)
-    data = youtube_api.list_transcripts_json(real_id, include_transcript=include_transcript)
+    data = youtube_api.list_transcripts_json(real_id, include_transcript=include_transcript, include_timestamps=include_timestamps)
     
     if "error" in data:
         raise HTTPException(status_code=400, detail=data["error"])

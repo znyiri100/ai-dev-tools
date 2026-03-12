@@ -122,6 +122,31 @@ def get_video_metadata(video_id: str) -> dict:
         except Exception as e2:
             return {"error": str(e2)}
 
+def _format_timestamp(seconds: float) -> str:
+    """Format a timestamp in seconds to YouTube-style M:SS or H:MM:SS format.
+
+    YouTube stores caption timing as a floating-point number of seconds from
+    the start of the video (e.g. 20.0, 26.4, 3661.0).  This helper converts
+    that value into the compact human-readable form shown in YouTube's
+    transcript panel:
+
+    * Videos under one hour → ``M:SS``  (e.g. ``0:20``, ``1:05``, ``59:59``)
+    * Videos one hour or longer → ``H:MM:SS``  (e.g. ``1:00:00``, ``2:02:02``)
+
+    Args:
+        seconds: Elapsed time in seconds from the beginning of the video.
+
+    Returns:
+        A string timestamp in ``M:SS`` or ``H:MM:SS`` format.
+    """
+    total_seconds = int(seconds)
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    secs = total_seconds % 60
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
 def get_transcript_text(transcript_obj):
     """Fetch transcript data and return the full text."""
     try:
@@ -144,8 +169,78 @@ def get_transcript_text(transcript_obj):
         print(error_msg, file=sys.stderr)
         return error_msg
 
-def list_transcripts_json(video_id: str, include_transcript: bool = False):
-    """Retrieve all transcripts and return as a JSON-compatible dictionary."""
+def get_transcript_with_timestamps(transcript_obj):
+    """Fetch transcript data and return text with YouTube-style timestamps.
+
+    **How the timestamps work**
+
+    YouTube stores every caption track as a timed text file (e.g. a ``.srv3``
+    or WebVTT ``.vtt`` file) that YouTube's servers generate from either a
+    manual upload or automatic speech recognition.  Each caption entry in that
+    file carries three fields:
+
+    * ``start``    – when the caption appears, in seconds from the video start
+      (e.g. ``20.0`` for the 0:20 mark)
+    * ``duration`` – how many seconds it stays on screen (e.g. ``3.5``)
+    * ``text``     – the words spoken during that window
+
+    The ``youtube-transcript-api`` library downloads that caption file and
+    exposes each entry as a ``FetchedTranscriptSnippet`` object (or a plain
+    dict in older library versions).  This function reads the ``start`` field
+    from every snippet, converts it to a human-readable ``[M:SS]`` label via
+    :func:`_format_timestamp`, and prepends it to the caption text:
+
+    .. code-block:: text
+
+        [0:20] In today's tech check. Tell us all about it.
+        [0:26] So according to a memo obtained by The Information...
+        [0:34] Google's recent progress could create some temporary...
+
+    The result mirrors exactly what you see in YouTube's built-in transcript
+    panel (shown in the screenshot that prompted this feature).
+
+    Args:
+        transcript_obj: A transcript object returned by
+            ``YouTubeTranscriptApi.list(video_id)``.  Its ``.fetch()`` method
+            must return an iterable of snippet objects or dicts that each
+            expose a ``start`` (float, seconds) and ``text`` (str) field.
+
+    Returns:
+        A newline-separated string where every line is ``[M:SS] caption text``.
+        On error, returns a string starting with ``"ERROR fetching transcript:"``.
+    """
+    try:
+        data = transcript_obj.fetch()
+        lines = []
+        for snippet in data:
+            if hasattr(snippet, 'start') and hasattr(snippet, 'text'):
+                start = snippet.start
+                text = snippet.text
+            elif isinstance(snippet, dict):
+                start = snippet.get('start', 0)
+                text = snippet.get('text', '')
+            else:
+                lines.append(str(snippet))
+                continue
+            timestamp = _format_timestamp(start)
+            lines.append(f"[{timestamp}] {text}")
+        return "\n".join(lines)
+    except Exception as e:
+        error_msg = f"ERROR fetching transcript: {str(e)}"
+        print(error_msg, file=sys.stderr)
+        return error_msg
+
+def list_transcripts_json(video_id: str, include_transcript: bool = False, include_timestamps: bool = False):
+    """Retrieve all transcripts and return as a JSON-compatible dictionary.
+
+    Args:
+        video_id: YouTube video ID.
+        include_transcript: When True, include the full plain-text transcript in
+            each transcript entry under the ``transcript`` key.
+        include_timestamps: When True, include a timestamped version of the
+            transcript (one ``[M:SS] text`` line per snippet) under the
+            ``transcript_with_timestamps`` key.
+    """
     result = {
         "video_id": video_id,
         "url": f"https://www.youtube.com/watch?v={video_id}",
@@ -199,6 +294,9 @@ def list_transcripts_json(video_id: str, include_transcript: bool = False):
                 
                 if include_transcript:
                     t_info["transcript"] = get_transcript_text(transcript)
+
+                if include_timestamps:
+                    t_info["transcript_with_timestamps"] = get_transcript_with_timestamps(transcript)
                     
                 result["transcripts"].append(t_info)
         except Exception as e:
@@ -269,6 +367,7 @@ def main():
     parser.add_argument('--topic', '-t', help='Search YouTube for videos by topic')
     parser.add_argument('--max-results', '-m', type=int, default=5, help='Max search results (1-50)')
     parser.add_argument('--transcript', action='store_true', help='Include full transcript text')
+    parser.add_argument('--timestamps', action='store_true', help='Include transcript with timestamps (e.g. [0:20] text)')
     parser.add_argument('--upload', action='store_true', help='Upload fetched metadata and transcript list to DuckDB')
     
     args = parser.parse_args()
@@ -289,7 +388,7 @@ def main():
 
     all_outputs = []
     for video_id in video_ids:
-        output_data = list_transcripts_json(video_id, include_transcript=args.transcript)
+        output_data = list_transcripts_json(video_id, include_transcript=args.transcript, include_timestamps=args.timestamps)
         all_outputs.append(output_data)
         
         # Optional Database Upload

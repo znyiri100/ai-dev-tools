@@ -34,6 +34,59 @@ The application is designed as a decoupled system with a **FastAPI backend** han
   - Generates Quizzes.
   - Provides an interactive Chat persona ("Tutor").
 
+## Transcript Pipeline — Libraries & Code Flow
+
+### Libraries used
+
+| Library / Service | Installed via | Handles |
+|---|---|---|
+| [`youtube-transcript-api`](https://github.com/jdepoix/youtube-transcript-api) | `pip install youtube-transcript-api` | **Primary transcript library.** Downloads the timed caption file that YouTube stores for every video and exposes each entry as a `FetchedTranscriptSnippet` with `start` (seconds), `duration`, and `text`. |
+| [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) | `pip install yt-dlp` | Video **metadata** (title, author, view count, duration) and frontend **topic search** via the `ytsearchN:<query>` extractor syntax. |
+| [`google-api-python-client`](https://github.com/googleapis/google-api-python-client) (YouTube Data API v3) | `pip install google-api-python-client` | Backend **topic search** — requires a `YOUTUBE_API_KEY`. |
+| MCP Docker container (`mcp/youtube-transcript`) | `docker pull mcp/youtube-transcript` | **Alternative transcript path** via `youtube_mcp.py`. Runs `youtube-transcript-api` inside a container and communicates with the backend over the Model Context Protocol (MCP). |
+
+### Step-by-step code flow (primary path)
+
+```
+API endpoint  →  list_transcripts_json(video_id)
+                        │
+                        ├─ get_video_metadata(video_id)   ← yt-dlp (metadata)
+                        │
+                        └─ YouTubeTranscriptApi().list(video_id)   ← youtube-transcript-api
+                                  │
+                                  │  for each transcript (language):
+                                  ├─ get_transcript_text(transcript)
+                                  │       transcript.fetch()  →  [ {text, start, duration}, … ]
+                                  │       join all text fields  →  plain string
+                                  │
+                                  └─ get_transcript_with_timestamps(transcript)
+                                          transcript.fetch()  →  [ {text, start, duration}, … ]
+                                          _format_timestamp(start)  →  "M:SS" / "H:MM:SS"
+                                          format each line as "[M:SS] text"
+```
+
+1. `list_transcripts_json` creates a `YouTubeTranscriptApi` instance (optionally with a proxy config).
+2. `api.list(video_id)` returns all available caption tracks for the video (one per language, showing whether each is auto-generated or manual).
+3. Calling `transcript.fetch()` on a track downloads the actual timed caption file from YouTube's servers; each snippet carries `start` (float seconds), `duration` (float seconds), and `text` (str).
+4. `get_transcript_text` joins all `text` fields into a single plain string.
+5. `get_transcript_with_timestamps` additionally reads `start` from each snippet, converts it via `_format_timestamp`, and prefixes every line with `[M:SS]`, matching YouTube's own transcript panel.
+
+### MP4 / local video files
+
+**Learnify currently does not process MP4 or other local video files.**  
+All transcripts are retrieved directly from YouTube's servers — no audio download, decoding, or speech-to-text step is involved.
+
+If local video support were added in the future, the typical approach would be:
+
+| Step | Tool |
+|---|---|
+| Extract audio from MP4 | [`ffmpeg`](https://ffmpeg.org/) or [`moviepy`](https://zulko.github.io/moviepy/) |
+| Transcribe audio to text | [OpenAI Whisper](https://github.com/openai/whisper) (`openai-whisper`) or a cloud STT API |
+
+None of these libraries are currently in the project's dependencies.
+
+---
+
 ## Key Workflows
 
 ### A. Find & Store
