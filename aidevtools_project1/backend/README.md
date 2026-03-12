@@ -20,6 +20,8 @@ This project uses three different libraries/services to interact with YouTube:
 | **Google YouTube Data API v3** | `google-api-python-client` | Topic-based video search in the backend. Requires a `YOUTUBE_API_KEY` from [Google Cloud Console](https://console.cloud.google.com/). |
 | **MCP Docker container** (`mcp/youtube-transcript`) | `mcp` (client) | Alternative transcript-fetching path via `youtube_mcp.py`. Runs `youtube-transcript-api` inside a Docker container and communicates via the Model Context Protocol (MCP). |
 
+> **MP4 / local video files:** This project only retrieves transcripts from YouTube's servers — no audio is downloaded and no speech-to-text step is used. MP4 support is not implemented. See [`docs/program_flow.md`](../docs/program_flow.md#transcript-pipeline--libraries--code-flow) for details.
+
 ### Quick Example — fetching a transcript in Python
 
 ```python
